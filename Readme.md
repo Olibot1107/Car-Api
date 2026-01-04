@@ -1,72 +1,146 @@
-## Freenove Three-wheeled Smart Car Kit for Raspberry Pi
+# Car API
 
-> A three-wheeled car kit for learning Raspberry Pi.
+A Python-based API for controlling a Raspberry Pi-powered smart car with camera streaming, movement control, and remote access capabilities.
 
-### Download
+## Features
 
-* **Use command in terminal**
+- **Camera Streaming**: MJPEG video feed via Flask web server
+- **Movement Control**: Forward/backward movement with speed control
+- **Steering**: Servo-controlled steering system
+- **Camera Pan/Tilt**: Servo-controlled camera positioning
+- **Sensors**: Ultrasonic distance sensor
+- **LED Control**: RGB LED indicators
+- **Buzzer**: Audio feedback
+- **TCP Server**: Remote control via network commands
+- **Comprehensive Testing**: Unit tests for all components
 
-	Run following command to download all the files in this repository.
-	
-	`git clone --depth 1 https://github.com/Freenove/Freenove_Three-wheeled_Smart_Car_Kit_for_Raspberry_Pi.git`
-  
-* **Manually download in browser**
+## Requirements
 
-    Click the green "Clone or download" button, then click "Download ZIP" button in the pop-up window.
-    Do NOT click the "Open in Desktop" button, it will lead you to install Github software.
+- Raspberry Pi (tested on Raspberry Pi 4)
+- Compatible car chassis with motors and servos
+- Camera module (Raspberry Pi Camera)
+- Python 3.7+
 
-> If you meet any difficulties, please contact our support team for help.
+### Dependencies
 
-Freenove provides free and quick customer support. Including but not limited to:
+```
+flask
+picamera2
+opencv-python
+smbus
+```
 
-* Quality problems of products
-* Using Problems of products
-* Questions of learning and creation
-* Opinions and suggestions
-* Ideas and thoughts
+## Installation
 
-Please send an email to:
+1. Clone the repository:
+```bash
+git clone https://github.com/Olibot1107/Car-Api.git
+cd Car-Api
+```
 
-[support@freenove.com](mailto:support@freenove.com)
+2. Install dependencies:
+```bash
+pip3 install flask picamera2 opencv-python smbus
+```
 
-We will reply to you within one working day.
+## Usage
 
-### Purchase
+### Camera Streaming
 
-Please visit the following page to purchase our products:
+Start the camera server:
+```bash
+python3 lib/camera.py
+```
 
-http://store.freenove.com
+Access the video feed at: `http://raspberrypi:5000`
 
-Business customers please contact us through the following email address:
+### Car Control
 
-[sale@freenove.com](mailto:sale@freenove.com)
+```python
+from lib.movement import CarControl
 
-### Copyright
+car = CarControl()
 
-All the files in this repository are released under [Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License](http://creativecommons.org/licenses/by-nc-sa/3.0/).
+# Basic movement
+car.forward()
+car.set_speed(50)  # 0-100 speed
+car.backward()
+car.stop()
 
-![CC BY-NC-SA](https://i.creativecommons.org/l/by-nc-sa/3.0/88x31.png)
+# Steering
+car.turn_left(30)
+car.turn_right(30)
+car.center_steering()
 
-This means you can use them on your own derived works, in part or completely. But NOT for the purpose of commercial use.
-You can find a copy of the license in this repository.
+# Camera control
+car.camera_left(10)
+car.camera_right(10)
+car.camera_up(10)
+car.camera_down(10)
+car.camera_center()
 
-Freenove brand and logo are copyright of Freenove Creative Technology Co., Ltd. Can't be used without formal permission.
+# Sensors and outputs
+distance = car.get_distance()  # Ultrasonic sensor
+car.buzzer_on(2000)
+car.led_rgb(True, False, True)  # Red and blue LEDs
+```
 
+### TCP Server
 
-### About
+Start the TCP server for remote control:
+```bash
+python3 Server/mTCPServer.py
+```
 
-Freenove is an open-source electronics platform.
+The server listens on port 12345 for commands.
 
-Freenove is committed to helping customer quickly realize the creative idea and product prototypes, making it easy to get started for enthusiasts of programing and electronics and launching innovative open source products.
+## Testing
 
-Our services include:
+Run all tests:
+```bash
+python3 test/run_tests.py
+```
 
-* Robot kits
-* Learning kits for Arduino, Raspberry Pi and micro:bit
-* Electronic components and modules, tools
-* Product customization service
+Individual tests:
+```bash
+python3 test/test_camera.py
+python3 test/test_movement.py
+python3 test/test_tcp.py
+```
 
-Our code and circuit are open source. You can obtain the details and the latest information through visiting the following web site:
+## Project Structure
 
-http://www.freenove.com
+```
+Car-Api/
+├── lib/
+│   ├── camera.py       # Flask camera streaming server
+│   └── movement.py     # Car control class
+├── Server/
+│   ├── Command.py      # Command definitions
+│   ├── mDev.py         # Hardware interface
+│   └── mTCPServer.py   # TCP control server
+├── test/
+│   ├── README.md       # Test documentation
+│   ├── run_tests.py    # Test runner
+│   ├── test_camera.py  # Camera tests
+│   ├── test_movement.py # Movement tests
+│   └── test_tcp.py     # TCP tests
+├── Shield Firmware/    # Hardware firmware files
+└── README.md           # This file
+```
 
+## Hardware Setup
+
+This API is designed to work with Raspberry Pi-based smart car platforms that use I2C communication for motor control and servo positioning.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is open source. Please check individual files for license information.
