@@ -11,7 +11,6 @@ class CarControl:
             self.mdev = mDEV(i2c_addr)
             self.steering_angle = 90
             self.camera_pan = 90
-            self.camera_tilt = 90
             logger.info("Car control initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize car control: {e}")
@@ -132,7 +131,7 @@ class CarControl:
         """Get current steering angle"""
         return self.steering_angle
 
-    # Camera servo methods
+    # Camera servo methods (for pan/tilt control)
     def camera_left(self, degrees=10):
         """Pan camera left by specified degrees"""
         try:
@@ -157,38 +156,11 @@ class CarControl:
             logger.error(f"Error panning camera right: {e}")
             return False
 
-    def camera_up(self, degrees=10):
-        """Tilt camera up by specified degrees"""
-        try:
-            if not isinstance(degrees, (int, float)):
-                logger.error(f"Invalid degrees type: {type(degrees)}")
-                return False
-            self.camera_tilt = max(0, self.camera_tilt - degrees)
-            return self.set_camera_tilt(self.camera_tilt)
-        except Exception as e:
-            logger.error(f"Error tilting camera up: {e}")
-            return False
-
-    def camera_down(self, degrees=10):
-        """Tilt camera down by specified degrees"""
-        try:
-            if not isinstance(degrees, (int, float)):
-                logger.error(f"Invalid degrees type: {type(degrees)}")
-                return False
-            self.camera_tilt = min(180, self.camera_tilt + degrees)
-            return self.set_camera_tilt(self.camera_tilt)
-        except Exception as e:
-            logger.error(f"Error tilting camera down: {e}")
-            return False
-
     def camera_center(self):
-        """Center the camera (pan and tilt)"""
+        """Center the camera (pan only)"""
         try:
             self.camera_pan = 90
-            self.camera_tilt = 90
-            success = self.set_camera_pan(90)
-            success &= self.set_camera_tilt(90)
-            return success
+            return self.set_camera_pan(90)
         except Exception as e:
             logger.error(f"Error centering camera: {e}")
             return False
@@ -206,26 +178,9 @@ class CarControl:
             logger.error(f"Error setting camera pan: {e}")
             return False
 
-    def set_camera_tilt(self, angle):
-        """Set camera tilt to specific angle (0-180)"""
-        try:
-            if not isinstance(angle, (int, float)):
-                logger.error(f"Invalid angle type: {type(angle)}")
-                return False
-
-            self.camera_tilt = max(0, min(180, angle))
-            return self.mdev.setServo('3', self.camera_tilt)
-        except Exception as e:
-            logger.error(f"Error setting camera tilt: {e}")
-            return False
-
     def get_camera_pan(self):
         """Get current camera pan angle"""
         return self.camera_pan
-
-    def get_camera_tilt(self):
-        """Get current camera tilt angle"""
-        return self.camera_tilt
 
     # Buzzer methods
     def buzzer_on(self, frequency=2000):

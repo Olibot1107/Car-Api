@@ -1,32 +1,26 @@
 # Car API
 
-A Python-based API for controlling a Raspberry Pi-powered smart car with camera streaming, movement control, and remote access capabilities.
+A Python-based API for controlling a Raspberry Pi-powered smart car with movement control and remote access capabilities.
 
 ## Features
 
-- **Camera Streaming**: MJPEG video feed via Flask web server
 - **Movement Control**: Forward/backward movement with speed control
 - **Steering**: Servo-controlled steering system
-- **Camera Pan/Tilt**: Servo-controlled camera positioning
+- **Camera Pan**: Servo-controlled camera left/right positioning
 - **Sensors**: Ultrasonic distance sensor
 - **LED Control**: RGB LED indicators
 - **Buzzer**: Audio feedback
 - **TCP Server**: Remote control via network commands
-- **Comprehensive Testing**: Unit tests for all components
 
 ## Requirements
 
 - Raspberry Pi (tested on Raspberry Pi 4)
 - Compatible car chassis with motors and servos
-- Camera module (Raspberry Pi Camera)
 - Python 3.7+
 
 ### Dependencies
 
 ```
-flask
-picamera2
-opencv-python
 smbus
 ```
 
@@ -40,19 +34,10 @@ cd Car-Api
 
 2. Install dependencies:
 ```bash
-pip3 install flask picamera2 opencv-python smbus
+pip3 install smbus
 ```
 
 ## Usage
-
-### Camera Streaming
-
-Start the camera server:
-```bash
-python3 lib/camera.py
-```
-
-Access the video feed at: `http://raspberrypi:5000`
 
 ### Car Control
 
@@ -75,8 +60,6 @@ car.center_steering()
 # Camera control
 car.camera_left(10)
 car.camera_right(10)
-car.camera_up(10)
-car.camera_down(10)
 car.camera_center()
 
 # Sensors and outputs
@@ -108,7 +91,6 @@ This will move the car forward for 4 seconds, stop for 2 seconds, then move back
 ```
 Car-Api/
 ├── lib/
-│   ├── camera.py       # Flask camera streaming server
 │   └── movement.py     # Car control class
 ├── Server/
 │   ├── Command.py      # Command definitions
