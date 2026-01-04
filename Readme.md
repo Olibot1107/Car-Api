@@ -6,7 +6,7 @@ A Python-based API for controlling a Raspberry Pi-powered smart car with movemen
 
 - **Movement Control**: Forward/backward movement with speed control
 - **Steering**: Servo-controlled steering system
-- **Camera Pan**: Servo-controlled camera left/right positioning
+- **Camera Pan/Tilt**: Servo-controlled camera positioning (pan left/right, tilt up/down)
 - **Sensors**: Ultrasonic distance sensor
 - **LED Control**: RGB LED indicators
 - **Buzzer**: Audio feedback
@@ -60,6 +60,8 @@ car.center_steering()
 # Camera control
 car.camera_left(10)
 car.camera_right(10)
+car.camera_up(10)
+car.camera_down(10)
 car.camera_center()
 
 # Sensors and outputs
