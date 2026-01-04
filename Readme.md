@@ -94,19 +94,14 @@ python3 Server/mTCPServer.py
 
 The server listens on port 12345 for commands.
 
-## Testing
+## Demo
 
-Run all tests:
+Run the movement demo to test forward/backward movement:
 ```bash
-python3 test/run_tests.py
+python3 demo_movement.py
 ```
 
-Individual tests:
-```bash
-python3 test/test_camera.py
-python3 test/test_movement.py
-python3 test/test_tcp.py
-```
+This will move the car forward for 4 seconds, stop for 2 seconds, then move backward for 4 seconds.
 
 ## Project Structure
 
@@ -119,13 +114,8 @@ Car-Api/
 │   ├── Command.py      # Command definitions
 │   ├── mDev.py         # Hardware interface
 │   └── mTCPServer.py   # TCP control server
-├── test/
-│   ├── README.md       # Test documentation
-│   ├── run_tests.py    # Test runner
-│   ├── test_camera.py  # Camera tests
-│   ├── test_movement.py # Movement tests
-│   └── test_tcp.py     # TCP tests
 ├── Shield Firmware/    # Hardware firmware files
+├── demo_movement.py    # Movement demonstration script
 └── README.md           # This file
 ```
 

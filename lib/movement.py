@@ -1,145 +1,379 @@
+import logging
 from Server.mDev import mDEV, numMap
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 class CarControl:
     def __init__(self, i2c_addr=0x18):
-        self.mdev = mDEV(i2c_addr)
-        self.steering_angle = 90
-        self.camera_pan = 90
-        self.camera_tilt = 90
+        """Initialize car control with error handling"""
+        try:
+            self.mdev = mDEV(i2c_addr)
+            self.steering_angle = 90
+            self.camera_pan = 90
+            self.camera_tilt = 90
+            logger.info("Car control initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize car control: {e}")
+            raise
 
     # Movement methods
     def forward(self):
-        self.mdev.writeReg(self.mdev.CMD_DIR1, 1)
-        self.mdev.writeReg(self.mdev.CMD_DIR2, 1)
+        """Move car forward"""
+        try:
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):
+                logger.error("Failed to set forward direction for right motor")
+                return False
+            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 1):
+                logger.error("Failed to set forward direction for left motor")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error moving forward: {e}")
+            return False
 
     def backward(self):
-        self.mdev.writeReg(self.mdev.CMD_DIR1, 0)
-        self.mdev.writeReg(self.mdev.CMD_DIR2, 0)
+        """Move car backward"""
+        try:
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 0):
+                logger.error("Failed to set backward direction for right motor")
+                return False
+            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 0):
+                logger.error("Failed to set backward direction for left motor")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error moving backward: {e}")
+            return False
 
     def stop(self):
-        self.mdev.writeReg(self.mdev.CMD_PWM1, 0)
-        self.mdev.writeReg(self.mdev.CMD_PWM2, 0)
+        """Stop the car"""
+        try:
+            if not self.mdev.writeReg(self.mdev.CMD_PWM1, 0):
+                logger.error("Failed to stop right motor")
+                return False
+            if not self.mdev.writeReg(self.mdev.CMD_PWM2, 0):
+                logger.error("Failed to stop left motor")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error stopping car: {e}")
+            return False
 
     def set_speed(self, speed):
-        pwm = max(0, min(1000, speed * 10))
-        self.mdev.writeReg(self.mdev.CMD_PWM1, pwm)
-        self.mdev.writeReg(self.mdev.CMD_PWM2, pwm)
+        """Set car speed (0-100)"""
+        try:
+            if not isinstance(speed, (int, float)):
+                logger.error(f"Invalid speed type: {type(speed)}")
+                return False
+
+            speed = max(0, min(100, speed))  # Clamp speed to 0-100
+            pwm = int(speed * 10)  # Convert to PWM value
+
+            if not self.mdev.writeReg(self.mdev.CMD_PWM1, pwm):
+                logger.error("Failed to set speed for right motor")
+                return False
+            if not self.mdev.writeReg(self.mdev.CMD_PWM2, pwm):
+                logger.error("Failed to set speed for left motor")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error setting speed: {e}")
+            return False
 
     # Steering methods
     def turn_left(self, degrees=30):
-        self.steering_angle = max(0, self.steering_angle - degrees)
-        self.set_steering(self.steering_angle)
+        """Turn steering left by specified degrees"""
+        try:
+            if not isinstance(degrees, (int, float)):
+                logger.error(f"Invalid degrees type: {type(degrees)}")
+                return False
+            self.steering_angle = max(0, self.steering_angle - degrees)
+            return self.set_steering(self.steering_angle)
+        except Exception as e:
+            logger.error(f"Error turning left: {e}")
+            return False
 
     def turn_right(self, degrees=30):
-        self.steering_angle = min(180, self.steering_angle + degrees)
-        self.set_steering(self.steering_angle)
+        """Turn steering right by specified degrees"""
+        try:
+            if not isinstance(degrees, (int, float)):
+                logger.error(f"Invalid degrees type: {type(degrees)}")
+                return False
+            self.steering_angle = min(180, self.steering_angle + degrees)
+            return self.set_steering(self.steering_angle)
+        except Exception as e:
+            logger.error(f"Error turning right: {e}")
+            return False
 
     def center_steering(self):
-        self.steering_angle = 90
-        self.set_steering(90)
+        """Center the steering"""
+        try:
+            self.steering_angle = 90
+            return self.set_steering(90)
+        except Exception as e:
+            logger.error(f"Error centering steering: {e}")
+            return False
 
     def set_steering(self, angle):
-        self.steering_angle = max(0, min(180, angle))
-        self.mdev.setServo('1', self.steering_angle)
+        """Set steering to specific angle (0-180)"""
+        try:
+            if not isinstance(angle, (int, float)):
+                logger.error(f"Invalid angle type: {type(angle)}")
+                return False
+
+            self.steering_angle = max(0, min(180, angle))
+            return self.mdev.setServo('1', self.steering_angle)
+        except Exception as e:
+            logger.error(f"Error setting steering angle: {e}")
+            return False
 
     def get_steering(self):
+        """Get current steering angle"""
         return self.steering_angle
 
     # Camera servo methods
     def camera_left(self, degrees=10):
-        self.camera_pan = max(0, self.camera_pan - degrees)
-        self.set_camera_pan(self.camera_pan)
+        """Pan camera left by specified degrees"""
+        try:
+            if not isinstance(degrees, (int, float)):
+                logger.error(f"Invalid degrees type: {type(degrees)}")
+                return False
+            self.camera_pan = max(0, self.camera_pan - degrees)
+            return self.set_camera_pan(self.camera_pan)
+        except Exception as e:
+            logger.error(f"Error panning camera left: {e}")
+            return False
 
     def camera_right(self, degrees=10):
-        self.camera_pan = min(180, self.camera_pan + degrees)
-        self.set_camera_pan(self.camera_pan)
+        """Pan camera right by specified degrees"""
+        try:
+            if not isinstance(degrees, (int, float)):
+                logger.error(f"Invalid degrees type: {type(degrees)}")
+                return False
+            self.camera_pan = min(180, self.camera_pan + degrees)
+            return self.set_camera_pan(self.camera_pan)
+        except Exception as e:
+            logger.error(f"Error panning camera right: {e}")
+            return False
 
     def camera_up(self, degrees=10):
-        self.camera_tilt = max(0, self.camera_tilt - degrees)
-        self.set_camera_tilt(self.camera_tilt)
+        """Tilt camera up by specified degrees"""
+        try:
+            if not isinstance(degrees, (int, float)):
+                logger.error(f"Invalid degrees type: {type(degrees)}")
+                return False
+            self.camera_tilt = max(0, self.camera_tilt - degrees)
+            return self.set_camera_tilt(self.camera_tilt)
+        except Exception as e:
+            logger.error(f"Error tilting camera up: {e}")
+            return False
 
     def camera_down(self, degrees=10):
-        self.camera_tilt = min(180, self.camera_tilt + degrees)
-        self.set_camera_tilt(self.camera_tilt)
+        """Tilt camera down by specified degrees"""
+        try:
+            if not isinstance(degrees, (int, float)):
+                logger.error(f"Invalid degrees type: {type(degrees)}")
+                return False
+            self.camera_tilt = min(180, self.camera_tilt + degrees)
+            return self.set_camera_tilt(self.camera_tilt)
+        except Exception as e:
+            logger.error(f"Error tilting camera down: {e}")
+            return False
 
     def camera_center(self):
-        self.camera_pan = 90
-        self.camera_tilt = 90
-        self.set_camera_pan(90)
-        self.set_camera_tilt(90)
+        """Center the camera (pan and tilt)"""
+        try:
+            self.camera_pan = 90
+            self.camera_tilt = 90
+            success = self.set_camera_pan(90)
+            success &= self.set_camera_tilt(90)
+            return success
+        except Exception as e:
+            logger.error(f"Error centering camera: {e}")
+            return False
 
     def set_camera_pan(self, angle):
-        self.camera_pan = max(0, min(180, angle))
-        self.mdev.setServo('2', self.camera_pan)
+        """Set camera pan to specific angle (0-180)"""
+        try:
+            if not isinstance(angle, (int, float)):
+                logger.error(f"Invalid angle type: {type(angle)}")
+                return False
+
+            self.camera_pan = max(0, min(180, angle))
+            return self.mdev.setServo('2', self.camera_pan)
+        except Exception as e:
+            logger.error(f"Error setting camera pan: {e}")
+            return False
 
     def set_camera_tilt(self, angle):
-        self.camera_tilt = max(0, min(180, angle))
-        self.mdev.setServo('3', self.camera_tilt)
+        """Set camera tilt to specific angle (0-180)"""
+        try:
+            if not isinstance(angle, (int, float)):
+                logger.error(f"Invalid angle type: {type(angle)}")
+                return False
+
+            self.camera_tilt = max(0, min(180, angle))
+            return self.mdev.setServo('3', self.camera_tilt)
+        except Exception as e:
+            logger.error(f"Error setting camera tilt: {e}")
+            return False
 
     def get_camera_pan(self):
+        """Get current camera pan angle"""
         return self.camera_pan
 
     def get_camera_tilt(self):
+        """Get current camera tilt angle"""
         return self.camera_tilt
 
     # Buzzer methods
     def buzzer_on(self, frequency=2000):
-        self.mdev.writeReg(self.mdev.CMD_BUZZER, frequency)
+        """Turn buzzer on with specified frequency"""
+        try:
+            if not isinstance(frequency, (int, float)):
+                logger.error(f"Invalid frequency type: {type(frequency)}")
+                return False
+
+            frequency = max(0, min(65535, int(frequency)))  # Clamp frequency to valid range
+            return self.mdev.setBuzzer(frequency)
+        except Exception as e:
+            logger.error(f"Error turning buzzer on: {e}")
+            return False
 
     def buzzer_off(self):
-        self.mdev.writeReg(self.mdev.CMD_BUZZER, 0)
+        """Turn buzzer off"""
+        try:
+            return self.mdev.setBuzzer(0)
+        except Exception as e:
+            logger.error(f"Error turning buzzer off: {e}")
+            return False
 
     # LED methods
     def led_red_on(self):
-        self.mdev.writeReg(self.mdev.CMD_IO1, 0)
+        """Turn red LED on"""
+        try:
+            return self.mdev.writeReg(self.mdev.CMD_IO1, 0)
+        except Exception as e:
+            logger.error(f"Error turning red LED on: {e}")
+            return False
 
     def led_red_off(self):
-        self.mdev.writeReg(self.mdev.CMD_IO1, 1)
+        """Turn red LED off"""
+        try:
+            return self.mdev.writeReg(self.mdev.CMD_IO1, 1)
+        except Exception as e:
+            logger.error(f"Error turning red LED off: {e}")
+            return False
 
     def led_green_on(self):
-        self.mdev.writeReg(self.mdev.CMD_IO2, 0)
+        """Turn green LED on"""
+        try:
+            return self.mdev.writeReg(self.mdev.CMD_IO2, 0)
+        except Exception as e:
+            logger.error(f"Error turning green LED on: {e}")
+            return False
 
     def led_green_off(self):
-        self.mdev.writeReg(self.mdev.CMD_IO2, 1)
+        """Turn green LED off"""
+        try:
+            return self.mdev.writeReg(self.mdev.CMD_IO2, 1)
+        except Exception as e:
+            logger.error(f"Error turning green LED off: {e}")
+            return False
 
     def led_blue_on(self):
-        self.mdev.writeReg(self.mdev.CMD_IO3, 0)
+        """Turn blue LED on"""
+        try:
+            return self.mdev.writeReg(self.mdev.CMD_IO3, 0)
+        except Exception as e:
+            logger.error(f"Error turning blue LED on: {e}")
+            return False
 
     def led_blue_off(self):
-        self.mdev.writeReg(self.mdev.CMD_IO3, 1)
+        """Turn blue LED off"""
+        try:
+            return self.mdev.writeReg(self.mdev.CMD_IO3, 1)
+        except Exception as e:
+            logger.error(f"Error turning blue LED off: {e}")
+            return False
 
     def led_all_off(self):
-        self.led_red_off()
-        self.led_green_off()
-        self.led_blue_off()
+        """Turn all LEDs off"""
+        try:
+            success = self.led_red_off()
+            success &= self.led_green_off()
+            success &= self.led_blue_off()
+            return success
+        except Exception as e:
+            logger.error(f"Error turning all LEDs off: {e}")
+            return False
 
     def led_rgb(self, r, g, b):
-        if r: self.led_red_on()
-        else: self.led_red_off()
-        if g: self.led_green_on()
-        else: self.led_green_off()
-        if b: self.led_blue_on()
-        else: self.led_blue_off()
+        """Set RGB LED colors (True/False for each color)"""
+        try:
+            success = True
+            if r:
+                success &= self.led_red_on()
+            else:
+                success &= self.led_red_off()
+            if g:
+                success &= self.led_green_on()
+            else:
+                success &= self.led_green_off()
+            if b:
+                success &= self.led_blue_on()
+            else:
+                success &= self.led_blue_off()
+            return success
+        except Exception as e:
+            logger.error(f"Error setting RGB LED: {e}")
+            return False
 
     # Ultrasonic sensor
     def get_distance(self):
-        return self.mdev.getSonic()
+        """Get distance from ultrasonic sensor in cm"""
+        try:
+            distance = self.mdev.getSonic()
+            if distance < 0:
+                logger.warning(f"Invalid distance reading: {distance}")
+                return 0.0
+            return distance
+        except Exception as e:
+            logger.error(f"Error getting distance: {e}")
+            return 0.0
 
     # Advanced movement
     def move(self, left_speed, right_speed):
         """Move with different speeds for left/right motors (for turning)"""
-        # Left motor
-        if left_speed >= 0:
-            self.mdev.writeReg(self.mdev.CMD_DIR2, 1)
-            self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
-        else:
-            self.mdev.writeReg(self.mdev.CMD_DIR2, 0)
-            self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
+        try:
+            if not isinstance(left_speed, (int, float)) or not isinstance(right_speed, (int, float)):
+                logger.error(f"Invalid speed types: left={type(left_speed)}, right={type(right_speed)}")
+                return False
 
-        # Right motor
-        if right_speed >= 0:
-            self.mdev.writeReg(self.mdev.CMD_DIR1, 1)
-            self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
-        else:
-            self.mdev.writeReg(self.mdev.CMD_DIR1, 0)
-            self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
+            # Clamp speeds to valid PWM range
+            left_speed = max(-1000, min(1000, left_speed))
+            right_speed = max(-1000, min(1000, right_speed))
+
+            success = True
+
+            # Left motor
+            if left_speed >= 0:
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR2, 1)
+                success &= self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
+            else:
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR2, 0)
+                success &= self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
+
+            # Right motor
+            if right_speed >= 0:
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 1)
+                success &= self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
+            else:
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 0)
+                success &= self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
+
+            return success
+        except Exception as e:
+            logger.error(f"Error in advanced movement: {e}")
+            return False

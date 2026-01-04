@@ -1,9 +1,19 @@
+import logging
 from socket import *
 import threading
 from Command import COMMAND as cmd
 from mDev import *
 
-mdev = mDEV()
+# Set up logging
+logger = logging.getLogger(__name__)
+
+# Initialize mDEV with error handling
+try:
+    mdev = mDEV()
+except Exception as e:
+    logger.error(f"Failed to initialize Smart Car Shield: {e}")
+    logger.error("Please check shield connection and power switches")
+    raise
 
 class mTCPServer(threading.Thread):
     HOST = ''
