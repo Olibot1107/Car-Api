@@ -5,12 +5,15 @@
 # auther      : www.freenove.com
 # modification: 2020/03/26
 # Enhanced error handling: 2026/01/04
+# Configuration support: 2026/01/05
 ########################################################################
 import smbus
 import time
 import threading
 from threading import Lock
 import logging
+import json
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -44,8 +47,8 @@ class mDEV:
     SERVO_MIN_PULSE_WIDTH = 500
     SONIC_MAX_HIGH_BYTE = 50
 
-    def __init__(self,addr=0x18):
-        """Initialize the Smart Car Shield with error handling"""
+    def __init__(self,addr=0x18, config_file="config.json"):
+        """Initialize the Smart Car Shield with error handling and config loading"""
         self.address = addr #default address of mDEV
         self.bus = None
         self.mutex = Lock()
@@ -55,6 +58,9 @@ class mDEV:
         self.Is_Buzzer_State_True = False
         self.handle = True
 
+        # Load configuration for limits and settings
+        self.config = self.load_config(config_file)
+
         try:
             self.bus = smbus.SMBus(1)
             logger.info(f"Smart Car Shield initialized at I2C address 0x{self.address:02x}")
@@ -62,6 +68,42 @@ class mDEV:
             logger.error(f"Failed to initialize I2C bus: {e}")
             logger.error("Make sure the Smart Car Shield is properly connected and powered on")
             raise RuntimeError("I2C bus initialization failed") from e
+
+    def load_config(self, config_file):
+        """Load configuration from JSON file"""
+        try:
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                logger.info(f"Loaded configuration from {config_file}")
+                return config
+            else:
+                logger.warning(f"Config file {config_file} not found, using defaults")
+                return self.get_default_config()
+        except Exception as e:
+            logger.error(f"Error loading config file {config_file}: {e}, using defaults")
+            return self.get_default_config()
+
+    def get_default_config(self):
+        """Return default configuration values"""
+        return {
+            "car_settings": {
+                "motors": {
+                    "right_motor": {"forward_direction": 0, "backward_direction": 1},
+                    "left_motor": {"forward_direction": 1, "backward_direction": 0}
+                },
+                "steering": {
+                    "center_angle": 90, "max_angle": 180, "min_angle": 0,
+                    "turn_rate_degrees": 5, "center_return_rate": 3
+                },
+                "camera": {
+                    "pan_center": 90, "tilt_center": 90, "pan_max": 180, "pan_min": 0,
+                    "tilt_max": 180, "tilt_min": 0, "move_rate_degrees": 5
+                },
+                "speed": {"default_percentage": 50, "max_percentage": 100, "min_percentage": 0},
+                "control": {"loop_delay_seconds": 0.1, "status_update_enabled": True}
+            }
+        }
     def i2cRead(self,reg):
         self.bus.read_byte_data(self.address,reg)
         
@@ -123,7 +165,8 @@ class mDEV:
                         self.bus.write_byte(self.address,cmd+1)
                         d = self.bus.read_byte_data(self.address,cmd+1)
 
-                        if(a[0] == c and c < self.SONIC_MAX_HIGH_BYTE ):
+                        sonic_max = self.config["car_settings"]["hardware"]["sonic_max_high_byte"]
+                        if(a[0] == c and c < sonic_max ):
                             return c<<8 | d
                         else:
                             continue
@@ -162,20 +205,37 @@ class mDEV:
                 logger.error(f"Invalid angle type: {type(angle)}")
                 return False
 
-            angle = max(0, min(180, angle))  # Clamp angle to valid range
-            pulse_width = numMap(angle, 0, 180, 500, 2500)
-
             if index == "1":
+                # Steering servo - use steering-specific config
+                steering_config = self.config["car_settings"]["steering"]
+                angle_min = steering_config["min_angle"]
+                angle_max = steering_config["max_angle"]
+                pulse_min = steering_config["pulse_min"]
+                pulse_max = steering_config["pulse_max"]
+
+                angle = max(angle_min, min(angle_max, angle))  # Clamp angle to steering range
+                pulse_width = numMap(angle, angle_min, angle_max, pulse_min, pulse_max)
                 return self.writeReg(self.CMD_SERVO1, pulse_width)
-            elif index == "2":
-                return self.writeReg(self.CMD_SERVO2, pulse_width)
-            elif index == "3":
-                return self.writeReg(self.CMD_SERVO3, pulse_width)
-            elif index == "4":
-                return self.writeReg(self.CMD_SERVO4, pulse_width)
+
             else:
-                logger.error(f"Invalid servo index: {index}")
-                return False
+                # Other servos (camera) - use general hardware config
+                servo_pulse_min = self.config["car_settings"]["hardware"]["servo_pulse_min"]
+                servo_pulse_max = self.config["car_settings"]["hardware"]["servo_pulse_max"]
+                servo_angle_min = self.config["car_settings"]["hardware"]["servo_angle_min"]
+                servo_angle_max = self.config["car_settings"]["hardware"]["servo_angle_max"]
+
+                angle = max(servo_angle_min, min(servo_angle_max, angle))  # Clamp angle to valid range
+                pulse_width = numMap(angle, servo_angle_min, servo_angle_max, servo_pulse_min, servo_pulse_max)
+
+                if index == "2":
+                    return self.writeReg(self.CMD_SERVO2, pulse_width)
+                elif index == "3":
+                    return self.writeReg(self.CMD_SERVO3, pulse_width)
+                elif index == "4":
+                    return self.writeReg(self.CMD_SERVO4, pulse_width)
+                else:
+                    logger.error(f"Invalid servo index: {index}")
+                    return False
         except Exception as e:
             logger.error(f"Error setting servo {index}: {e}")
             return False

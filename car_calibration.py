@@ -7,16 +7,9 @@
 # Modification: 2026/01/05
 ########################################################################
 """
-Car Calibration and Testing
+Steering Calibration
 
-Interactive testing of all car components:
-- Motors (forward/backward with speed control)
-- Steering servo
-- Camera pan/tilt servos
-- LEDs (RGB)
-- Buzzer
-- Ultrasonic sensor
-- Reset to default state
+Calibrate the steering center position for your car.
 
 Usage:
 python3 car_calibration.py
@@ -34,450 +27,88 @@ logger = logging.getLogger(__name__)
 class CarCalibrator:
     def __init__(self):
         self.car = CarControl()
-        self.config_modified = False
-        logger.info("Car calibration system initialized")
+        logger.info("Steering calibration system initialized")
+
+    def calibrate_steering_center(self):
+        """Calibrate the steering center position"""
+        print("\n=== STEERING CENTER CALIBRATION ===")
+        print("This will help set the correct center position for your steering servo.")
+        print("Make sure your steering hardware is physically centered first.")
+        print("\nInstructions:")
+        print("1. Physically center your steering (straight ahead)")
+        print("2. Use the controls below to find the correct center angle")
+        print("3. When satisfied, save the configuration")
+        print("\nControls:")
+        print("  [angle] - Set steering angle (0-180)")
+        print("  c - Center steering")
+        print("  s - Save current position as center")
+        print("  q - Quit without saving")
+
+        while True:
+            try:
+                cmd = input(f"\nCurrent steering angle: {self.car.get_steering()}° > ").lower().strip()
+
+                if cmd.isdigit():
+                    angle = int(cmd)
+                    if 0 <= angle <= 180:
+                        self.car.set_steering(angle)
+                        print(f"Steering set to {angle}°")
+                    else:
+                        print("Angle must be 0-180")
+                elif cmd == 'c':
+                    self.car.center_steering()
+                    print(f"Steering centered to {self.car.get_steering()}°")
+                elif cmd == 's':
+                    current_angle = self.car.get_steering()
+                    if input(f"\nSave {current_angle}° as the new steering center? (y/n): ").lower().strip() == 'y':
+                        return self.save_steering_center(current_angle)
+                    else:
+                        print("Save cancelled.")
+                elif cmd == 'q':
+                    print("Calibration cancelled.")
+                    return False
+                else:
+                    print("Invalid command. Use number, c, s, or q.")
+
+            except KeyboardInterrupt:
+                print("\nCalibration interrupted.")
+                return False
 
     def reset_to_defaults(self):
-        """Reset all components to default state"""
-        logger.info("Resetting all components to default state...")
-
-        # Stop motors
-        self.car.stop()
-
-        # Center steering
+        """Reset steering to default state"""
         self.car.center_steering()
 
-        # Center camera
-        self.car.camera_center()
-
-        # Turn off all LEDs
-        self.car.led_all_off()
-
-        # Turn off buzzer
-        self.car.buzzer_off()
-
-        logger.info("All components reset to default state")
-        print("✓ All components reset to defaults")
-
-    def save_config(self):
-        """Save current configuration to config.json"""
+    def save_steering_center(self, center_angle):
+        """Save the steering center angle to config.json"""
         try:
-            # Update steering center angle to current position
-            current_steering = self.car.get_steering()
-            self.car.config["car_settings"]["steering"]["center_angle"] = current_steering
+            # Update steering center angle
+            self.car.config["car_settings"]["steering"]["center_angle"] = center_angle
 
             # Save to file
             with open("config.json", 'w') as f:
                 json.dump(self.car.config, f, indent=2)
 
-            logger.info(f"Configuration saved to config.json (steering center: {current_steering}°)")
-            print(f"✓ Configuration saved to config.json (steering center: {current_steering}°)")
+            logger.info(f"Steering center saved to config.json: {center_angle}°")
+            print(f"✓ Steering center saved: {center_angle}°")
+            print("The car will now use this as the center position for steering.")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to save configuration: {e}")
-            print(f"✗ Failed to save configuration: {e}")
+            logger.error(f"Failed to save steering center: {e}")
+            print(f"✗ Failed to save steering center: {e}")
             return False
 
-    def test_motors(self):
-        """Test motor functionality"""
-        print("\n=== MOTOR TEST ===")
-        print("Testing forward movement...")
-
-        if self.car.forward():
-            print("✓ Forward command sent")
-        else:
-            print("✗ Forward command failed")
-
-        for speed in [25, 50, 75, 100]:
-            if self.car.set_speed(speed):
-                print(f"✓ Speed set to {speed}%")
-                time.sleep(0.5)
-            else:
-                print(f"✗ Failed to set speed to {speed}%")
-
-        time.sleep(1)
-        print("Testing backward movement...")
-
-        if self.car.backward():
-            print("✓ Backward command sent")
-        else:
-            print("✗ Backward command failed")
-
-        for speed in [25, 50, 75, 100]:
-            if self.car.set_speed(speed):
-                print(f"✓ Speed set to {speed}%")
-                time.sleep(0.5)
-            else:
-                print(f"✗ Failed to set speed to {speed}%")
-
-        time.sleep(1)
-        if self.car.stop():
-            print("✓ Motors stopped")
-        else:
-            print("✗ Failed to stop motors")
-
-    def test_steering(self):
-        """Test steering servo"""
-        print("\n=== STEERING TEST ===")
-        print("Testing steering angles...")
-
-        angles = [0, 45, 90, 135, 180]
-        for angle in angles:
-            if self.car.set_steering(angle):
-                print(f"✓ Steering set to {angle}°")
-                time.sleep(0.5)
-            else:
-                print(f"✗ Failed to set steering to {angle}°")
-
-        # Test center function
-        if self.car.center_steering():
-            print(f"✓ Steering centered at {self.car.get_steering()}°")
-        else:
-            print("✗ Failed to center steering")
-
-    def test_camera(self):
-        """Test camera servos"""
-        print("\n=== CAMERA TEST ===")
-        print("Testing camera pan...")
-
-        for angle in [0, 45, 90, 135, 180]:
-            if self.car.set_camera_pan(angle):
-                print(f"✓ Camera pan set to {angle}°")
-                time.sleep(0.3)
-            else:
-                print(f"✗ Failed to set camera pan to {angle}°")
-
-        print("Testing camera tilt...")
-        for angle in [0, 45, 90, 135, 180]:
-            if self.car.set_camera_tilt(angle):
-                print(f"✓ Camera tilt set to {angle}°")
-                time.sleep(0.3)
-            else:
-                print(f"✗ Failed to set camera tilt to {angle}°")
-
-        # Test center function
-        if self.car.camera_center():
-            print(f"✓ Camera centered - Pan: {self.car.get_camera_pan()}°, Tilt: {self.car.get_camera_tilt()}°")
-        else:
-            print("✗ Failed to center camera")
-
-    def test_leds(self):
-        """Test LED functionality"""
-        print("\n=== LED TEST ===")
-        colors = [
-            ("Red", self.car.led_red_on, self.car.led_red_off),
-            ("Green", self.car.led_green_on, self.car.led_green_off),
-            ("Blue", self.car.led_blue_on, self.car.led_blue_off)
-        ]
-
-        for name, on_func, off_func in colors:
-            if on_func():
-                print(f"✓ {name} LED turned on")
-                time.sleep(0.5)
-                if off_func():
-                    print(f"✓ {name} LED turned off")
-                else:
-                    print(f"✗ Failed to turn off {name} LED")
-            else:
-                print(f"✗ Failed to turn on {name} LED")
-
-        # Test RGB combinations
-        print("Testing RGB combinations...")
-        rgb_tests = [
-            ("Red", True, False, False),
-            ("Green", False, True, False),
-            ("Blue", False, False, True),
-            ("Yellow", True, True, False),
-            ("Cyan", False, True, True),
-            ("Magenta", True, False, True),
-            ("White", True, True, True)
-        ]
-
-        for name, r, g, b in rgb_tests:
-            if self.car.led_rgb(r, g, b):
-                print(f"✓ RGB set to {name}")
-                time.sleep(0.3)
-            else:
-                print(f"✗ Failed to set RGB to {name}")
-
-        if self.car.led_all_off():
-            print("✓ All LEDs turned off")
-        else:
-            print("✗ Failed to turn off all LEDs")
-
-    def test_buzzer(self):
-        """Test buzzer functionality"""
-        print("\n=== BUZZER TEST ===")
-        frequencies = [1000, 2000, 3000, 4000]
-
-        for freq in frequencies:
-            if self.car.buzzer_on(freq):
-                print(f"✓ Buzzer playing at {freq}Hz")
-                time.sleep(0.3)
-            else:
-                print(f"✗ Failed to play buzzer at {freq}Hz")
-
-        if self.car.buzzer_off():
-            print("✓ Buzzer turned off")
-        else:
-            print("✗ Failed to turn off buzzer")
-
-    def test_ultrasonic(self):
-        """Test ultrasonic sensor"""
-        print("\n=== ULTRASONIC SENSOR TEST ===")
-        print("Testing distance measurements...")
-
-        for i in range(5):
-            distance = self.car.get_distance()
-            if distance > 0:
-                print(f"✓ Distance: {distance:.1f}cm")
-            else:
-                print(f"✗ Invalid distance reading: {distance}cm")
-            time.sleep(0.5)
-
-    def interactive_mode(self):
-        """Interactive component control"""
-        print("\n=== INTERACTIVE MODE ===")
-        print("Commands:")
-        print("  m - Motor control")
-        print("  s - Steering control")
-        print("  c - Camera control")
-        print("  l - LED control")
-        print("  b - Buzzer control")
-        print("  u - Ultrasonic test")
-        print("  r - Reset to defaults")
-        print("  q - Quit")
-
-        while True:
-            try:
-                cmd = input("\nEnter command: ").lower().strip()
-
-                if cmd == 'm':
-                    self.interactive_motors()
-                elif cmd == 's':
-                    self.interactive_steering()
-                elif cmd == 'c':
-                    self.interactive_camera()
-                elif cmd == 'l':
-                    self.interactive_leds()
-                elif cmd == 'b':
-                    self.interactive_buzzer()
-                elif cmd == 'u':
-                    self.interactive_ultrasonic()
-                elif cmd == 'r':
-                    self.reset_to_defaults()
-                elif cmd == 'q':
-                    break
-                else:
-                    print("Invalid command. Use: m, s, c, l, b, u, r, q")
-
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"Error: {e}")
-
-    def interactive_motors(self):
-        """Interactive motor control"""
-        print("\nMotor Control:")
-        print("  f - Forward")
-        print("  b - Backward")
-        print("  s - Stop")
-        print("  [number] - Set speed %")
-        print("  q - Back")
-
-        while True:
-            cmd = input("Motor> ").lower().strip()
-            if cmd == 'f':
-                self.car.forward()
-                print("Moving forward")
-            elif cmd == 'b':
-                self.car.backward()
-                print("Moving backward")
-            elif cmd == 's':
-                self.car.stop()
-                print("Stopped")
-            elif cmd.isdigit():
-                speed = int(cmd)
-                if 0 <= speed <= 100:
-                    self.car.set_speed(speed)
-                    print(f"Speed set to {speed}%")
-                else:
-                    print("Speed must be 0-100")
-            elif cmd == 'q':
-                self.car.stop()
-                break
-            else:
-                print("Invalid command")
-
-    def interactive_steering(self):
-        """Interactive steering control"""
-        print("\nSteering Control:")
-        print("  [number] - Set angle (0-180)")
-        print("  c - Center")
-        print("  q - Back")
-
-        while True:
-            cmd = input("Steering> ").lower().strip()
-            if cmd.isdigit():
-                angle = int(cmd)
-                if 0 <= angle <= 180:
-                    self.car.set_steering(angle)
-                    print(f"Steering set to {angle}°")
-                else:
-                    print("Angle must be 0-180")
-            elif cmd == 'c':
-                self.car.center_steering()
-                print("Steering centered")
-            elif cmd == 'q':
-                break
-            else:
-                print("Invalid command")
-
-    def interactive_camera(self):
-        """Interactive camera control"""
-        print("\nCamera Control:")
-        print("  p [angle] - Set pan angle (0-180)")
-        print("  t [angle] - Set tilt angle (0-180)")
-        print("  c - Center camera")
-        print("  q - Back")
-
-        while True:
-            cmd = input("Camera> ").lower().strip()
-            if cmd.startswith('p '):
-                try:
-                    angle = int(cmd[2:])
-                    if 0 <= angle <= 180:
-                        self.car.set_camera_pan(angle)
-                        print(f"Camera pan set to {angle}°")
-                    else:
-                        print("Angle must be 0-180")
-                except:
-                    print("Invalid angle")
-            elif cmd.startswith('t '):
-                try:
-                    angle = int(cmd[2:])
-                    if 0 <= angle <= 180:
-                        self.car.set_camera_tilt(angle)
-                        print(f"Camera tilt set to {angle}°")
-                    else:
-                        print("Angle must be 0-180")
-                except:
-                    print("Invalid angle")
-            elif cmd == 'c':
-                self.car.camera_center()
-                print("Camera centered")
-            elif cmd == 'q':
-                break
-            else:
-                print("Invalid command")
-
-    def interactive_leds(self):
-        """Interactive LED control"""
-        print("\nLED Control:")
-        print("  r - Red on/off")
-        print("  g - Green on/off")
-        print("  b - Blue on/off")
-        print("  o - All off")
-        print("  q - Back")
-
-        led_states = {'r': False, 'g': False, 'b': False}
-
-        while True:
-            cmd = input("LED> ").lower().strip()
-            if cmd in ['r', 'g', 'b']:
-                led_states[cmd] = not led_states[cmd]
-                self.car.led_rgb(led_states['r'], led_states['g'], led_states['b'])
-                state = "ON" if led_states[cmd] else "OFF"
-                color = {'r': 'Red', 'g': 'Green', 'b': 'Blue'}[cmd]
-                print(f"{color} LED {state}")
-            elif cmd == 'o':
-                self.car.led_all_off()
-                led_states = {'r': False, 'g': False, 'b': False}
-                print("All LEDs off")
-            elif cmd == 'q':
-                break
-            else:
-                print("Invalid command")
-
-    def interactive_buzzer(self):
-        """Interactive buzzer control"""
-        print("\nBuzzer Control:")
-        print("  [freq] - Play frequency (0 to stop)")
-        print("  q - Back")
-
-        while True:
-            cmd = input("Buzzer> ").lower().strip()
-            if cmd.isdigit():
-                freq = int(cmd)
-                if freq == 0:
-                    self.car.buzzer_off()
-                    print("Buzzer off")
-                else:
-                    self.car.buzzer_on(freq)
-                    print(f"Buzzer playing at {freq}Hz")
-            elif cmd == 'q':
-                self.car.buzzer_off()
-                break
-            else:
-                print("Invalid command")
-
-    def interactive_ultrasonic(self):
-        """Interactive ultrasonic testing"""
-        print("\nUltrasonic Test:")
-        print("Taking distance readings...")
-
-        for i in range(10):
-            distance = self.car.get_distance()
-            print(f"✓ Distance: {distance:.1f}cm")
-            time.sleep(0.5)
-
-        print("Test complete")
-
     def run(self):
-        """Main run method"""
-        print("=== CAR CALIBRATION & TESTING SYSTEM ===")
-        print("Choose test mode:")
-        print("1. Full automated test")
-        print("2. Interactive control")
-        print("3. Reset to defaults only")
+        """Main run method - simplified steering calibration only"""
+        print("=== STEERING CALIBRATION ===")
+        print("Calibrate your car's steering center position")
 
-        while True:
-            try:
-                choice = input("\nEnter choice (1-3): ").strip()
+        success = self.calibrate_steering_center()
 
-                if choice == '1':
-                    print("\nRunning full automated test...")
-                    self.test_motors()
-                    self.test_steering()
-                    self.test_camera()
-                    self.test_leds()
-                    self.test_buzzer()
-                    self.test_ultrasonic()
-                    self.reset_to_defaults()
-                    print("\n✓ Full test completed!")
-
-                elif choice == '2':
-                    self.interactive_mode()
-
-                elif choice == '3':
-                    self.reset_to_defaults()
-
-                else:
-                    print("Invalid choice. Enter 1-3.")
-                    continue
-
-                if input("\nRun another test? (y/n): ").lower().strip() != 'y':
-                    break
-
-            except KeyboardInterrupt:
-                break
-
-        # Ask to save configuration
-        if input("\nSave current configuration to config.json? (y/n): ").lower().strip() == 'y':
-            self.save_config()
-
-        print("\nCalibration system exited.")
+        if success:
+            print("\n✓ Steering calibration completed successfully!")
+        else:
+            print("\n✗ Steering calibration was cancelled or failed.")
 
 def main():
     """Main function"""

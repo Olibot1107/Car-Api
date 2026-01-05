@@ -18,6 +18,8 @@
       "min_angle": 0,
       "turn_rate_degrees": 5,
       "center_return_rate": 3,
+      "pulse_min": 500,
+      "pulse_max": 2500,
       "comment": "Steering servo settings - adjust center_angle if steering is offset"
     },
     "camera": {
@@ -28,6 +30,8 @@
       "tilt_max": 180,
       "tilt_min": 0,
       "move_rate_degrees": 5,
+      "pulse_min": 500,
+      "pulse_max": 2500,
       "comment": "Camera servo settings"
     },
     "speed": {
@@ -40,6 +44,15 @@
       "loop_delay_seconds": 0.1,
       "status_update_enabled": true,
       "comment": "Control loop timing and features"
+    },
+    "hardware": {
+      "servo_pulse_min": 500,
+      "servo_pulse_max": 2500,
+      "servo_angle_min": 0,
+      "servo_angle_max": 180,
+      "sonic_max_high_byte": 50,
+      "i2c_address": 24,
+      "comment": "Hardware-specific limits and addresses"
     }
   }
 }
