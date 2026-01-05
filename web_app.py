@@ -77,11 +77,7 @@ def control(action):
         elif action == 'backward':
             success = car.backward() and car.set_speed(speed)
         elif action == 'stop':
-            hardstop = data.get('hardstop', False)
-            if hardstop:
-                success = car.hard_stop()
-            else:
-                success = car.stop()
+            success = car.stop()
         elif action == 'turn_left':
             success = car.turn_left(angle)
         elif action == 'turn_right':
@@ -134,6 +130,60 @@ def status():
         'steering_angle': car.get_steering() if car else 0,
         'camera_pan': car.get_camera_pan() if car else 0
     })
+
+@app.route('/detect_obstacle')
+def detect_obstacle():
+    """Detect obstacles using camera feed"""
+    try:
+        camera = cv2.VideoCapture(0)
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+        if not camera.isOpened():
+            return jsonify({'obstacle_detected': False, 'error': 'Camera not available'})
+
+        # Capture a single frame
+        success, frame = camera.read()
+        camera.release()
+
+        if not success:
+            return jsonify({'obstacle_detected': False, 'error': 'Failed to capture frame'})
+
+        # Convert to grayscale for processing
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Use Canny edge detection to find edges (walls, obstacles)
+        edges = cv2.Canny(blurred, 50, 150)
+
+        # Focus on the bottom portion of the image (where obstacles would be)
+        height, width = edges.shape
+        roi = edges[int(height * 0.6):height, :]  # Bottom 40% of image
+
+        # Count white pixels (edges) in the region of interest
+        edge_pixels = cv2.countNonZero(roi)
+        total_pixels = roi.shape[0] * roi.shape[1]
+
+        # Calculate edge density
+        edge_density = edge_pixels / total_pixels
+
+        # If edge density is high, likely there's an obstacle/wall
+        obstacle_threshold = 0.05  # 5% edge density threshold
+        obstacle_detected = edge_density > obstacle_threshold
+
+        logger.debug(f"Edge density: {edge_density:.3f}, Obstacle detected: {obstacle_detected}")
+
+        return jsonify({
+            'obstacle_detected': obstacle_detected,
+            'edge_density': edge_density,
+            'threshold': obstacle_threshold
+        })
+
+    except Exception as e:
+        logger.error(f"Obstacle detection error: {e}")
+        return jsonify({'obstacle_detected': False, 'error': str(e)})
 
 if __name__ == '__main__':
     init_car()  # Try to initialize car, but don't fail if it doesn't work

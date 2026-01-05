@@ -71,43 +71,7 @@ class CarControl:
             logger.error(f"Error stopping car: {e}")
             return False
 
-    def hard_stop(self):
-        """Stop the car with reverse braking for faster stopping"""
-        try:
-            # Get current motor directions and speeds (simplified - would need to track state)
-            # For hard stop, we'll briefly reverse both motors at low speed
-            # This creates a braking effect by opposing the car's momentum
 
-            # Set motors to reverse at low speed for braking
-            brake_power = 400  # Low power for braking (0-1000 range)
-
-            # Set direction to reverse for both motors
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):  # Right motor reverse
-                logger.error("Failed to set brake direction for right motor")
-                return False
-            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 0):  # Left motor reverse
-                logger.error("Failed to set brake direction for left motor")
-                return False
-
-            # Apply braking power
-            if not self.mdev.writeReg(self.mdev.CMD_PWM1, brake_power):
-                logger.error("Failed to apply brake to right motor")
-                return False
-            if not self.mdev.writeReg(self.mdev.CMD_PWM2, brake_power):
-                logger.error("Failed to apply brake to left motor")
-                return False
-
-            # Hold brake for a short time (adjust based on speed/car weight)
-            import time
-            time.sleep(0.30)  # 150ms brake pulse
-
-            # Then stop completely
-            return self.stop()
-
-        except Exception as e:
-            logger.error(f"Error performing hard stop: {e}")
-            # Fallback to normal stop if hard stop fails
-            return self.stop()
 
     def set_speed(self, speed):
         """Set car speed (0-100)"""

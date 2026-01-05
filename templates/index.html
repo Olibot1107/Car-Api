@@ -168,7 +168,7 @@
 
             <div class="slider-container">
                 <label>
-                    <input type="checkbox" id="hardstop-toggle"> Hard Stop (Reverse braking)
+                    <input type="checkbox" id="autonomous-toggle"> 🚫 Autonomous Obstacle Avoidance
                 </label>
             </div>
 
@@ -249,7 +249,7 @@
         async function sendCommand(action, data = {}) {
             try {
                 data.speed = parseInt(speedSlider.value);
-                data.hardstop = document.getElementById('hardstop-toggle').checked;
+                data.autonomous = document.getElementById('autonomous-toggle').checked;
                 const response = await fetch(`/control/${action}`, {
                     method: 'POST',
                     headers: {
@@ -265,6 +265,44 @@
                 return result;
             } catch (error) {
                 console.error('Network error:', error);
+            }
+        }
+
+        // Autonomous obstacle avoidance
+        let autonomousInterval = null;
+
+        document.getElementById('autonomous-toggle').addEventListener('change', function() {
+            if (this.checked) {
+                startAutonomousMode();
+            } else {
+                stopAutonomousMode();
+            }
+        });
+
+        async function startAutonomousMode() {
+            console.log('Starting autonomous obstacle avoidance...');
+            autonomousInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/detect_obstacle');
+                    const data = await response.json();
+                    if (data.obstacle_detected) {
+                        console.log('Obstacle detected! Reversing...');
+                        // Send reverse command
+                        await sendCommand('backward');
+                        // Stop after a short time
+                        setTimeout(() => sendCommand('stop'), 1000);
+                    }
+                } catch (error) {
+                    console.error('Autonomous mode error:', error);
+                }
+            }, 500); // Check every 500ms
+        }
+
+        function stopAutonomousMode() {
+            if (autonomousInterval) {
+                clearInterval(autonomousInterval);
+                autonomousInterval = null;
+                console.log('Stopped autonomous mode');
             }
         }
 
