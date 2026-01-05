@@ -21,7 +21,7 @@ class CarControl:
     def forward(self):
         """Move car forward"""
         try:
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 0):  # Inverted for motor A
                 logger.error("Failed to set forward direction for right motor")
                 return False
             if not self.mdev.writeReg(self.mdev.CMD_DIR2, 1):
@@ -35,7 +35,7 @@ class CarControl:
     def backward(self):
         """Move car backward"""
         try:
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 0):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):  # Inverted for motor A
                 logger.error("Failed to set backward direction for right motor")
                 return False
             if not self.mdev.writeReg(self.mdev.CMD_DIR2, 0):
@@ -365,12 +365,12 @@ class CarControl:
                 success &= self.mdev.writeReg(self.mdev.CMD_DIR2, 0)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
 
-            # Right motor
+            # Right motor (inverted for motor A)
             if right_speed >= 0:
-                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 1)
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 0)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
             else:
-                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 0)
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 1)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
 
             return success
