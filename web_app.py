@@ -203,7 +203,7 @@ def proximity_loop():
                     # Step 2: Go forwards until in the +10 spot (distance ~10cm)
                     if proximity_running:
                         car.forward()
-                        car.set_speed(10)  # Slow speed for precision
+                        car.set_speed(15)  # Slow speed for precision
                         while distance > 10 and proximity_running:
                             time.sleep(0.1)
                             distance = car.get_distance()
