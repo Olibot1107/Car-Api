@@ -118,6 +118,28 @@ def control(action):
         logger.error(f"Control error: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/emergency_stop', methods=['POST'])
+def emergency_stop():
+    """Emergency stop - stops car and shuts down the app"""
+    if not car:
+        return jsonify({'success': False, 'error': 'Car not initialized'})
+
+    try:
+        # Stop the car
+        success = car.stop()
+        logger.warning("Emergency stop activated - car stopped")
+
+        # Shut down the Flask app
+        import os
+        logger.warning("Shutting down application...")
+        os._exit(0)  # Force exit
+
+        return jsonify({'success': success, 'message': 'Emergency stop activated'})
+
+    except Exception as e:
+        logger.error(f"Emergency stop error: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 
 
 

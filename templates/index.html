@@ -179,7 +179,7 @@
 </head>
 <body>
     <!-- Emergency Stop Button - Always Visible -->
-    <button id="emergency-stop" class="emergency-stop" title="Emergency Stop (Spacebar)">STOP</button>
+    <button id="emergency-stop" class="emergency-stop" title="Emergency Stop - Stops car and shuts down app (Spacebar)">STOP</button>
 
     <div class="container">
         <h1>🚗 Car Control Web App</h1>
@@ -360,9 +360,14 @@
                 case 'q':
                     sendCommand('camera_center');
                     break;
-                // Space for stop
+                // Space for emergency stop - kills everything
                 case ' ':
-                    sendCommand('stop');
+                    fetch('/emergency_stop', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    }).catch(error => console.error('Emergency stop error:', error));
                     event.preventDefault(); // Prevent page scroll
                     break;
             }
@@ -380,8 +385,20 @@
             }
         }
 
-        // Emergency stop button
-        document.getElementById('emergency-stop').addEventListener('click', () => sendCommand('stop'));
+        // Emergency stop button - kills everything and shuts down app
+        document.getElementById('emergency-stop').addEventListener('click', async () => {
+            try {
+                await fetch('/emergency_stop', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                // App will shut down, so no response expected
+            } catch (error) {
+                console.error('Emergency stop error:', error);
+            }
+        });
 
         // Button controls (still available for touch devices)
         document.getElementById('forward').addEventListener('click', () => sendCommand('forward'));
