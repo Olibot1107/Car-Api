@@ -157,6 +157,17 @@
             </div>
         </div>
 
+        <!-- Ultrasonic Map -->
+        <div class="control-section">
+            <h2>🗺️ Ultrasonic Map</h2>
+            <div class="map-container">
+                <canvas id="map-canvas" width="400" height="400"></canvas>
+                <div style="text-align: center; margin-top: 10px;">
+                    <button id="update-map" class="btn-primary">Update Map</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Movement Controls -->
         <div class="control-section">
             <h2>🚙 Movement Controls</h2>
@@ -409,14 +420,86 @@
         `;
         document.querySelector('.container').insertBefore(instructions, document.querySelector('.container').firstChild.nextSibling);
 
+        // Map visualization
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function drawMap(scanPoints) {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw center point (car position)
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // Draw car representation
+            ctx.fillStyle = '#007bff';
+            ctx.fillRect(centerX - 10, centerY - 5, 20, 10);
+
+            // Draw scan points
+            for (const [angle, distance] of Object.entries(scanPoints)) {
+                if (distance > 0 && distance < 200) { // Only show reasonable distances
+                    const radians = (parseInt(angle) * Math.PI) / 180;
+                    const x = centerX + Math.sin(radians) * (distance * 2); // Scale for display
+                    const y = centerY - Math.cos(radians) * (distance * 2);
+
+                    // Color based on distance (closer = more red)
+                    const intensity = Math.max(0, 255 - (distance * 2.5));
+                    ctx.fillStyle = `rgb(${255 - intensity}, ${intensity}, 0)`;
+
+                    // Draw point
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // Draw line from center to point
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw distance rings
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 1;
+            for (let r = 50; r <= 150; r += 50) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, r * 2, 0, 2 * Math.PI);
+                ctx.stroke();
+                // Label distances
+                ctx.fillStyle = '#666';
+                ctx.font = '12px Arial';
+                ctx.fillText(`${r}cm`, centerX + r * 2 + 5, centerY + 5);
+            }
+        }
+
+        async function updateMap() {
+            try {
+                const response = await fetch('/scan_data');
+                const data = await response.json();
+                drawMap(data.scan_points);
+            } catch (error) {
+                console.error('Error updating map:', error);
+            }
+        }
+
+        document.getElementById('update-map').addEventListener('click', updateMap);
+
+        // Auto-update map every 3 seconds
+        setInterval(updateMap, 3000);
+
         // Auto-update status and distance every 2 seconds
         setInterval(() => {
             updateDistance();
             updateStatus();
         }, 2000);
 
-        // Initial status update
+        // Initial updates
         updateStatus();
+        updateMap();
     </script>
 </body>
 </html>

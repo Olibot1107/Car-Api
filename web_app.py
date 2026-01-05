@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 # Global variables
 car = None
-safety_thread = None
-safety_running = False
-emergency_mode = False
-emergency_stop_distance = 15.0  # cm
+scanner_thread = None
+scanner_running = False
+scan_data = {}  # Store scan points: {angle: distance}
+current_scan_angle = 0
+scan_step = 30  # degrees between scan points
+scan_range = (-90, 90)  # scan from -90 to +90 degrees
 
 def init_car():
     global car
@@ -146,97 +148,70 @@ def status():
         'camera_pan': car.get_camera_pan() if car else 0
     })
 
-def start_safety_monitor():
-    """Start the safety monitoring thread"""
-    global safety_thread, safety_running
-    if safety_running:
-        logger.warning("Safety monitor already running")
+def start_scanner():
+    """Start the ultrasonic scanner thread"""
+    global scanner_thread, scanner_running
+    if scanner_running:
+        logger.warning("Scanner already running")
         return
 
-    safety_running = True
-    safety_thread = threading.Thread(target=safety_monitor_loop, daemon=True)
-    safety_thread.start()
-    logger.info("Safety monitoring system started")
+    scanner_running = True
+    scanner_thread = threading.Thread(target=scanner_loop, daemon=True)
+    scanner_thread.start()
+    logger.info("Ultrasonic scanner started")
 
-def stop_safety_monitor():
-    """Stop the safety monitoring thread"""
-    global safety_running
-    safety_running = False
-    if safety_thread:
-        safety_thread.join(timeout=1.0)
-    logger.info("Safety monitoring system stopped")
+def stop_scanner():
+    """Stop the scanner thread"""
+    global scanner_running
+    scanner_running = False
+    if scanner_thread:
+        scanner_thread.join(timeout=1.0)
+    logger.info("Ultrasonic scanner stopped")
 
-def safety_monitor_loop():
-    """Main safety monitoring loop"""
-    global emergency_mode
-    logger.info("Safety monitor loop started")
-    while safety_running:
+def scanner_loop():
+    """Main scanning loop - creates a map of points around the car"""
+    logger.info("Scanner loop started")
+    while scanner_running:
         try:
-            if car:  # Only monitor if car is available
-                distance = car.get_distance()
-                logger.debug(f"Distance check: {distance:.1f}cm")
+            if car:  # Only scan if car is available
+                # Scan through different angles
+                for angle in range(scan_range[0], scan_range[1] + 1, scan_step):
+                    if not scanner_running:
+                        break
 
-                if distance > 0 and distance < emergency_stop_distance:
-                    if not emergency_mode:
-                        logger.warning(f"EMERGENCY: Obstacle detected at {distance:.1f}cm (< {emergency_stop_distance}cm)")
-                        trigger_emergency_stop()
-                elif emergency_mode and distance >= emergency_stop_distance + 5:  # Add buffer
-                    logger.info(f"Emergency mode cleared. Distance: {distance:.1f}cm")
-                    emergency_mode = False
+                    # Move camera/sensor to this angle
+                    # Assuming ultrasonic sensor is mounted on camera servo
+                    car.set_camera_pan(90 + angle)  # Center at 90, offset by angle
+                    time.sleep(0.2)  # Wait for servo to move
 
-            time.sleep(0.02)  # Check every 20ms for faster response
+                    # Take distance reading at this angle
+                    distance = car.get_distance()
+                    scan_data[angle] = distance
+
+                    logger.debug(f"Scan point: {angle}° -> {distance:.1f}cm")
+
+                # Return camera to center after scan
+                car.camera_center()
+                logger.debug(f"Scan complete. Points: {len(scan_data)}")
+
+            time.sleep(1.0)  # Wait 1 second between full scans
 
         except Exception as e:
-            logger.error(f"Safety monitor error: {e}")
-            time.sleep(0.5)  # Wait longer on error
+            logger.error(f"Scanner error: {e}")
+            time.sleep(0.5)
 
-def trigger_emergency_stop():
-    """Trigger emergency stop and reverse sequence"""
-    global emergency_mode
-
-    emergency_mode = True
-
-    try:
-        # Immediate stop
-        car.stop()
-        time.sleep(0.1)  # Brief pause
-
-        # Start reversing at moderate speed
-        reverse_speed = 300  # Moderate reverse speed (0-1000 range)
-        logger.warning("EMERGENCY: Reversing to clear obstacle")
-
-        # Set reverse direction
-        car.backward()
-
-        # Apply reverse power
-        car.mdev.writeReg(car.mdev.CMD_PWM1, reverse_speed)
-        car.mdev.writeReg(car.mdev.CMD_PWM2, reverse_speed)
-
-        # Keep reversing until safe distance or timeout
-        start_time = time.time()
-        timeout = 3.0  # Maximum reverse time (seconds)
-
-        while emergency_mode and safety_running and (time.time() - start_time) < timeout:
-            distance = car.get_distance()
-            if distance >= emergency_stop_distance + 5:  # Safe distance with buffer
-                break
-            time.sleep(0.1)
-
-        # Stop after reversing
-        car.stop()
-        logger.info("Emergency reverse sequence completed")
-
-    except Exception as e:
-        logger.error(f"Emergency stop sequence failed: {e}")
-        # Ensure we stop even if something fails
-        try:
-            if car:
-                car.stop()
-        except:
-            pass
+@app.route('/scan_data')
+def get_scan_data():
+    """Get current scan data for mapping"""
+    return jsonify({
+        'scan_points': scan_data,
+        'scan_step': scan_step,
+        'scan_range': scan_range,
+        'timestamp': time.time()
+    })
 
 if __name__ == '__main__':
     if init_car():
-        start_safety_monitor()  # Start safety monitoring if car initialized
+        start_scanner()  # Start ultrasonic scanner if car initialized
     logger.info("Starting web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
