@@ -532,12 +532,11 @@ def get_house_map(mapper):
 
 if __name__ == '__main__':
     # Run the autonomous mapper web server
-    global mapper_instance
     try:
         # Initialize car controller
         car = CarControl()
 
-        # Create autonomous mapper instance
+        # Create autonomous mapper instance (no global needed since it's module-level)
         mapper_instance = AutonomousMapper(car)
 
         logger.info("Starting Autonomous House Mapping web server on port 5001")
