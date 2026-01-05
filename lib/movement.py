@@ -1,5 +1,3 @@
-import json
-import os
 import logging
 from Server.mDev import mDEV, numMap
 
@@ -7,71 +5,26 @@ from Server.mDev import mDEV, numMap
 logger = logging.getLogger(__name__)
 
 class CarControl:
-    def __init__(self, i2c_addr=0x18, config_file="config.json"):
-        """Initialize car control with error handling and config loading"""
+    def __init__(self, i2c_addr=0x18):
+        """Initialize car control with error handling"""
         try:
-            # Load configuration
-            self.config = self.load_config(config_file)
-
             self.mdev = mDEV(i2c_addr)
-
-            # Initialize with config values
-            self.steering_angle = self.config["car_settings"]["steering"]["center_angle"]
-            self.camera_pan = self.config["car_settings"]["camera"]["pan_center"]
-            self.camera_tilt = self.config["car_settings"]["camera"]["tilt_center"]
-
-            logger.info("Car control initialized successfully with config")
+            self.steering_angle = 100
+            self.camera_pan = 90
+            self.camera_tilt = 90
+            logger.info("Car control initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize car control: {e}")
             raise
-
-    def load_config(self, config_file):
-        """Load configuration from JSON file"""
-        try:
-            if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    config = json.load(f)
-                logger.info(f"Loaded configuration from {config_file}")
-                return config
-            else:
-                logger.warning(f"Config file {config_file} not found, using defaults")
-                return self.get_default_config()
-        except Exception as e:
-            logger.error(f"Error loading config file {config_file}: {e}, using defaults")
-            return self.get_default_config()
-
-    def get_default_config(self):
-        """Return default configuration values"""
-        return {
-            "car_settings": {
-                "motors": {
-                    "right_motor": {"forward_direction": 0, "backward_direction": 1},
-                    "left_motor": {"forward_direction": 1, "backward_direction": 0}
-                },
-                "steering": {
-                    "center_angle": 90, "max_angle": 180, "min_angle": 0,
-                    "turn_rate_degrees": 5, "center_return_rate": 3
-                },
-                "camera": {
-                    "pan_center": 90, "tilt_center": 90, "pan_max": 180, "pan_min": 0,
-                    "tilt_max": 180, "tilt_min": 0, "move_rate_degrees": 5
-                },
-                "speed": {"default_percentage": 50, "max_percentage": 100, "min_percentage": 0},
-                "control": {"loop_delay_seconds": 0.1, "status_update_enabled": True}
-            }
-        }
 
     # Movement methods
     def forward(self):
         """Move car forward"""
         try:
-            right_dir = self.config["car_settings"]["motors"]["right_motor"]["forward_direction"]
-            left_dir = self.config["car_settings"]["motors"]["left_motor"]["forward_direction"]
-
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, right_dir):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 0):  # Inverted for motor A
                 logger.error("Failed to set forward direction for right motor")
                 return False
-            if not self.mdev.writeReg(self.mdev.CMD_DIR2, left_dir):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 1):
                 logger.error("Failed to set forward direction for left motor")
                 return False
             return True
@@ -82,13 +35,10 @@ class CarControl:
     def backward(self):
         """Move car backward"""
         try:
-            right_dir = self.config["car_settings"]["motors"]["right_motor"]["backward_direction"]
-            left_dir = self.config["car_settings"]["motors"]["left_motor"]["backward_direction"]
-
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, right_dir):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):  # Inverted for motor A
                 logger.error("Failed to set backward direction for right motor")
                 return False
-            if not self.mdev.writeReg(self.mdev.CMD_DIR2, left_dir):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 0):
                 logger.error("Failed to set backward direction for left motor")
                 return False
             return True
@@ -159,9 +109,8 @@ class CarControl:
     def center_steering(self):
         """Center the steering"""
         try:
-            center_angle = self.config["car_settings"]["steering"]["center_angle"]
-            self.steering_angle = center_angle
-            return self.set_steering(center_angle)
+            self.steering_angle = 100
+            return self.set_steering(100)
         except Exception as e:
             logger.error(f"Error centering steering: {e}")
             return False
@@ -410,22 +359,18 @@ class CarControl:
 
             # Left motor
             if left_speed >= 0:
-                left_dir = self.config["car_settings"]["motors"]["left_motor"]["forward_direction"]
-                success &= self.mdev.writeReg(self.mdev.CMD_DIR2, left_dir)
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR2, 1)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
             else:
-                left_dir = self.config["car_settings"]["motors"]["left_motor"]["backward_direction"]
-                success &= self.mdev.writeReg(self.mdev.CMD_DIR2, left_dir)
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR2, 0)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM2, abs(left_speed))
 
-            # Right motor
+            # Right motor (inverted for motor A)
             if right_speed >= 0:
-                right_dir = self.config["car_settings"]["motors"]["right_motor"]["forward_direction"]
-                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, right_dir)
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 0)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
             else:
-                right_dir = self.config["car_settings"]["motors"]["right_motor"]["backward_direction"]
-                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, right_dir)
+                success &= self.mdev.writeReg(self.mdev.CMD_DIR1, 1)
                 success &= self.mdev.writeReg(self.mdev.CMD_PWM1, abs(right_speed))
 
             return success

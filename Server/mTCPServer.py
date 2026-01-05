@@ -83,11 +83,11 @@ class mTCPServer(threading.Thread):
                     # Steering commands
                     elif cmd.CMD_TURN_LEFT[1:] in cmd_str:
                         value = int("0" + "".join(filter(str.isdigit, cmd_str)))
-                        mdev.writeReg(mdev.CMD_SERVO1, numMap(90+value, 0, 180, 500, 2500))
+                        mdev.writeReg(mdev.CMD_SERVO1, numMap(100+value, 0, 180, 500, 2500))
 
                     elif cmd.CMD_TURN_RIGHT[1:] in cmd_str:
                         value = int("0" + "".join(filter(str.isdigit, cmd_str)))
-                        mdev.writeReg(mdev.CMD_SERVO1, numMap(90-value, 0, 180, 500, 2500))
+                        mdev.writeReg(mdev.CMD_SERVO1, numMap(100-value, 0, 180, 500, 2500))
 
                     elif cmd.CMD_TURN_CENTER[1:] in cmd_str:
                         value = int("0" + "".join(filter(str.isdigit, cmd_str)))
