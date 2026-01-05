@@ -1,0 +1,45 @@
+{
+  "car_settings": {
+    "motors": {
+      "right_motor": {
+        "forward_direction": 0,
+        "backward_direction": 1,
+        "comment": "Right motor (CMD_DIR1) - inverted for motor A"
+      },
+      "left_motor": {
+        "forward_direction": 1,
+        "backward_direction": 0,
+        "comment": "Left motor (CMD_DIR2) - normal direction"
+      }
+    },
+    "steering": {
+      "center_angle": 90,
+      "max_angle": 180,
+      "min_angle": 0,
+      "turn_rate_degrees": 5,
+      "center_return_rate": 3,
+      "comment": "Steering servo settings - adjust center_angle if steering is offset"
+    },
+    "camera": {
+      "pan_center": 90,
+      "tilt_center": 90,
+      "pan_max": 180,
+      "pan_min": 0,
+      "tilt_max": 180,
+      "tilt_min": 0,
+      "move_rate_degrees": 5,
+      "comment": "Camera servo settings"
+    },
+    "speed": {
+      "default_percentage": 50,
+      "max_percentage": 100,
+      "min_percentage": 0,
+      "comment": "Speed settings (0-100%)"
+    },
+    "control": {
+      "loop_delay_seconds": 0.1,
+      "status_update_enabled": true,
+      "comment": "Control loop timing and features"
+    }
+  }
+}

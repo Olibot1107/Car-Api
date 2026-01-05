@@ -34,7 +34,7 @@ class CarController:
     def __init__(self):
         self.car = CarControl()
         self.running = True
-        self.current_speed = 50  # Default speed 50%
+        self.current_speed = self.car.config["car_settings"]["speed"]["default_percentage"]
         self.keys_pressed = set()
 
         # Movement states
@@ -61,32 +61,39 @@ class CarController:
                 else:
                     self.car.stop()
 
-                # Handle steering (faster turning - 5 degrees per step)
+                # Handle steering (using config turn rates)
+                turn_rate = self.car.config["car_settings"]["steering"]["turn_rate_degrees"]
+                center_rate = self.car.config["car_settings"]["steering"]["center_return_rate"]
+
                 if self.steering_left:
-                    # Turn left faster
+                    # Turn left
                     current_angle = self.car.get_steering()
-                    new_angle = max(0, current_angle - 5)
+                    new_angle = max(0, current_angle - turn_rate)
                     self.car.set_steering(new_angle)
                 elif self.steering_right:
-                    # Turn right faster
+                    # Turn right
                     current_angle = self.car.get_steering()
-                    new_angle = min(180, current_angle + 5)
+                    new_angle = min(180, current_angle + turn_rate)
                     self.car.set_steering(new_angle)
                 else:
-                    # Return to center faster when no steering input
+                    # Return to center when no steering input
+                    center_angle = self.car.config["car_settings"]["steering"]["center_angle"]
                     current_angle = self.car.get_steering()
-                    if current_angle < 85:
-                        self.car.set_steering(min(90, current_angle + 3))
-                    elif current_angle > 95:
-                        self.car.set_steering(max(90, current_angle - 3))
+                    if current_angle < center_angle - 5:
+                        self.car.set_steering(min(center_angle, current_angle + center_rate))
+                    elif current_angle > center_angle + 5:
+                        self.car.set_steering(max(center_angle, current_angle - center_rate))
 
-                # Display status info
-                if self.moving_forward or self.moving_backward or self.steering_left or self.steering_right:
-                    direction = "Forward" if self.moving_forward else "Backward" if self.moving_backward else "Stopped"
-                    steering = f"Left({self.car.get_steering()}°)" if self.steering_left else f"Right({self.car.get_steering()}°)" if self.steering_right else f"Center({self.car.get_steering()}°)"
-                    print(f"\rSpeed: {self.current_speed}% | Direction: {direction} | Steering: {steering} | Camera: Pan({self.car.get_camera_pan()}°) Tilt({self.car.get_camera_tilt()}°)", end="", flush=True)
+                # Display status info (if enabled in config)
+                if self.car.config["car_settings"]["control"]["status_update_enabled"]:
+                    if self.moving_forward or self.moving_backward or self.steering_left or self.steering_right:
+                        direction = "Forward" if self.moving_forward else "Backward" if self.moving_backward else "Stopped"
+                        steering = f"Left({self.car.get_steering()}°)" if self.steering_left else f"Right({self.car.get_steering()}°)" if self.steering_right else f"Center({self.car.get_steering()}°)"
+                        print(f"\rSpeed: {self.current_speed}% | Direction: {direction} | Steering: {steering} | Camera: Pan({self.car.get_camera_pan()}°) Tilt({self.car.get_camera_tilt()}°)", end="", flush=True)
 
-                time.sleep(0.1)  # Control loop delay
+                # Use config loop delay
+                loop_delay = self.car.config["car_settings"]["control"]["loop_delay_seconds"]
+                time.sleep(loop_delay)
 
             except Exception as e:
                 logger.error(f"Error in control loop: {e}")
