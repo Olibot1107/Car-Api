@@ -5,7 +5,6 @@ import cv2
 import time
 import threading
 from lib.movement import CarControl
-from autonomous_mapper import create_autonomous_mapper, start_house_mapping, stop_house_mapping, get_house_map
 
 app = Flask(__name__)
 CORS(app)
@@ -16,14 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Global variables
 car = None
-scanner_thread = None
-scanner_running = False
-scan_data = {}  # Store scan points: {angle: distance}
-current_scan_angle = 0
-scan_step = 15  # degrees between scan points (more points!)
-scan_range = (-90, 90)  # scan from -90 to +90 degrees
-last_movement_time = 0  # Track when car last moved
-movement_detected = False
+proximity_thread = None
+proximity_running = False
 
 # Autonomous mapping system
 mapper = None
@@ -63,7 +56,7 @@ def generate_camera_feed():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-            time.sleep(0.1)  # Control frame rate
+            time.sleep(0.05)  # Control frame rate - faster (20 FPS)
     finally:
         camera.release()
 
@@ -87,18 +80,14 @@ def control(action):
 
         if action == 'forward':
             success = car.forward() and car.set_speed(speed)
-            movement_detected = True
         elif action == 'backward':
             success = car.backward() and car.set_speed(speed)
-            movement_detected = True
         elif action == 'stop':
             success = car.stop()
         elif action == 'turn_left':
             success = car.turn_left(angle)
-            movement_detected = True
         elif action == 'turn_right':
             success = car.turn_right(angle)
-            movement_detected = True
         elif action == 'center_steering':
             success = car.center_steering()
         elif action == 'camera_left':
@@ -155,156 +144,60 @@ def status():
     return jsonify({
         'car_initialized': car is not None,
         'steering_angle': car.get_steering() if car else 0,
-        'camera_pan': car.get_camera_pan() if car else 0
+        'camera_pan': car.get_camera_pan() if car else 0,
+        'camera_tilt': car.get_camera_tilt() if car else 0,
+        'speed': car.get_speed() if car and hasattr(car, 'get_speed') else 0,
+        'distance': car.get_distance() if car else 0,
+        'led_red': car.led_red_state if car and hasattr(car, 'led_red_state') else False,
+        'led_green': car.led_green_state if car and hasattr(car, 'led_green_state') else False,
+        'led_blue': car.led_blue_state if car and hasattr(car, 'led_blue_state') else False,
+        'buzzer_active': car.buzzer_state if car and hasattr(car, 'buzzer_state') else False
     })
 
-def start_scanner():
-    """Start the ultrasonic scanner thread"""
-    global scanner_thread, scanner_running
-    if scanner_running:
-        logger.warning("Scanner already running")
+def start_proximity_detection():
+    """Start the proximity detection thread"""
+    global proximity_thread, proximity_running
+    if proximity_running:
+        logger.warning("Proximity detection already running")
         return
 
-    scanner_running = True
-    scanner_thread = threading.Thread(target=scanner_loop, daemon=True)
-    scanner_thread.start()
-    logger.info("Ultrasonic scanner started")
+    proximity_running = True
+    proximity_thread = threading.Thread(target=proximity_loop, daemon=True)
+    proximity_thread.start()
+    logger.info("Proximity detection started")
 
-def stop_scanner():
-    """Stop the scanner thread"""
-    global scanner_running
-    scanner_running = False
-    if scanner_thread:
-        scanner_thread.join(timeout=1.0)
-    logger.info("Ultrasonic scanner stopped")
+def stop_proximity_detection():
+    """Stop the proximity detection thread"""
+    global proximity_running
+    proximity_running = False
+    if proximity_thread:
+        proximity_thread.join(timeout=1.0)
+    logger.info("Proximity detection stopped")
 
-def scanner_loop():
-    """Main scanning loop - continuous 360° rotation scanning"""
-    global movement_detected  # Declare global at function start
-    logger.info("360° rotation scanner started")
-    rotation_scan_count = 0
+def proximity_loop():
+    """Main proximity detection loop - triggers backward movement when close to obstacles"""
+    logger.info("Proximity detection started - monitoring for obstacles within 30cm")
 
-    while scanner_running:
+    while proximity_running:
         try:
-            if car:  # Only scan if car is available
-                # Check if rotation scanning was requested
-                if movement_detected and getattr(scanner_loop, 'rotation_mode', False):
-                    # Full 360° rotation scanning mode
-                    logger.info("Starting 360° rotation scan for 900+ data points")
-                    rotation_scan_count += 1
-
-                    # Clear previous scan data for fresh rotation scan
-                    scan_data.clear()
-
-                    # Set camera to forward position for rotation
-                    car.camera_center()
-
-                    # Start slow rotation
-                    rotation_speed = 20  # Slow speed for controlled rotation (0-100)
-                    car.set_speed(rotation_speed)
-
-                    # Begin rotation (one wheel forward, one backward for spin)
-                    # This creates a slow spinning motion
-                    car.mdev.writeReg(car.mdev.CMD_DIR1, 0)  # Right wheel forward
-                    car.mdev.writeReg(car.mdev.CMD_DIR2, 1)  # Left wheel backward (for spin)
-                    car.mdev.writeReg(car.mdev.CMD_PWM1, rotation_speed)
-                    car.mdev.writeReg(car.mdev.CMD_PWM2, rotation_speed)
-
-                    # Collect data during full rotation
-                    points_collected = 0
-                    start_time = time.time()
-                    rotation_duration = 8.0  # 8 seconds for full 360° rotation
-
-                    while points_collected < 900 and (time.time() - start_time) < rotation_duration:
-                        if not scanner_running:
-                            break
-
-                        # Calculate current rotation angle (estimate based on time)
-                        elapsed = time.time() - start_time
-                        current_angle = (elapsed / rotation_duration) * 360.0
-
-                        # Take distance reading at current rotation position
-                        dist = car.get_distance()
-                        if dist > 0:
-                            # Store with rotation angle as key
-                            scan_data[current_angle] = dist
-                            points_collected += 1
-
-                            # Log progress every 100 points
-                            if points_collected % 100 == 0:
-                                logger.info(f"Rotation scan: {points_collected}/900 points collected")
-
-                        time.sleep(0.008)  # ~125 readings/second for 900 points in 7.2 seconds
-
-                    # Stop rotation
+            if car:  # Only monitor if car is available
+                distance = car.get_distance()
+                if distance > 0 and distance < 30:  # Less than 30cm
+                    logger.warning(f"Obstacle detected at {distance:.1f}cm - triggering emergency backward movement")
+                    # Emergency backward movement at high speed
+                    car.backward()
+                    car.set_speed(80)  # High speed backward
+                    time.sleep(0.5)  # Move back for 0.5 seconds
                     car.stop()
-                    car.camera_center()  # Return camera to center
-
-                    logger.info(f"360° rotation scan complete: {len(scan_data)} data points collected")
-                    setattr(scanner_loop, 'rotation_mode', False)  # Reset rotation mode
-
-                else:
-                    # Normal stationary scanning
-                    for angle in range(scan_range[0], scan_range[1] + 1, scan_step):
-                        if not scanner_running:
-                            break
-
-                        # Move camera/sensor to this angle
-                        car.set_camera_pan(90 + angle)
-                        time.sleep(0.08)  # Normal servo movement (80ms)
-
-                        # Take multiple readings for better data quality
-                        readings = []
-                        for _ in range(2):  # Take 2 readings per angle
-                            dist = car.get_distance()
-                            if dist > 0:
-                                readings.append(dist)
-                            time.sleep(0.02)
-
-                        # Calculate average for cleaner data
-                        if readings:
-                            avg_distance = sum(readings) / len(readings)
-                            scan_data[angle] = avg_distance
-
-                            logger.debug(f"Stationary scan {angle}°: {avg_distance:.1f}cm")
-
-                    # Return camera to center after scan
-                    car.camera_center()
-                    logger.debug(f"Stationary scan cycle complete. {len(scan_data)} active points")
-
-                    time.sleep(0.5)  # Slower cycle when stationary (500ms)
-
-                # Reset movement detection
-                movement_detected = False
+                    logger.info("Emergency backward movement completed")
 
         except Exception as e:
-            logger.error(f"Scanner error: {e}")
-            time.sleep(0.2)
+            logger.error(f"Proximity detection error: {e}")
 
-@app.route('/scan_data')
-def get_scan_data():
-    """Get current scan data for mapping"""
-    return jsonify({
-        'scan_points': scan_data,
-        'scan_step': scan_step,
-        'scan_range': scan_range,
-        'timestamp': time.time()
-    })
-
-@app.route('/start_rotation_scan', methods=['POST'])
-def start_rotation_scan():
-    """Trigger a 360° rotation scan"""
-    try:
-        # Set rotation mode flag for the scanner
-        setattr(scanner_loop, 'rotation_mode', True)
-        logger.info("360° rotation scan triggered")
-        return jsonify({'success': True, 'message': 'Rotation scan started'})
-    except Exception as e:
-        logger.error(f"Failed to start rotation scan: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        time.sleep(0.1)  # Check every 100ms
 
 if __name__ == '__main__':
     if init_car():
-        start_scanner()  # Start ultrasonic scanner if car initialized
+        start_proximity_detection()  # Start proximity detection if car initialized
     logger.info("Starting web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

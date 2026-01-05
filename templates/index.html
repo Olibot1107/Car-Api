@@ -154,17 +154,8 @@
             <h2>📹 Camera Feed</h2>
             <div class="camera-container">
                 <img src="/camera_feed" class="camera-feed" alt="Camera Feed">
-            </div>
-        </div>
-
-        <!-- Ultrasonic Map -->
-        <div class="control-section">
-            <h2>🗺️ Ultrasonic Map</h2>
-            <div class="map-container">
-                <canvas id="map-canvas" width="400" height="400"></canvas>
                 <div style="text-align: center; margin-top: 10px;">
-                    <button id="update-map" class="btn-primary">Update Map</button>
-                    <button id="rotation-scan" class="btn-warning" style="margin-left: 10px;">360° Scan</button>
+                    <button id="fullscreen-btn" class="btn-success">⛶ Full Screen</button>
                 </div>
             </div>
         </div>
@@ -244,6 +235,13 @@
                 <div>Car Initialized: <span id="car-status">Checking...</span></div>
                 <div>Steering Angle: <span id="steering-angle">0</span>°</div>
                 <div>Camera Pan: <span id="camera-pan">0</span>°</div>
+                <div>Camera Tilt: <span id="camera-tilt">0</span>°</div>
+                <div>Speed: <span id="current-speed">0</span>%</div>
+                <div>Distance: <span id="current-distance">0</span> cm</div>
+                <div>LED Red: <span id="led-red-status">Off</span></div>
+                <div>LED Green: <span id="led-green-status">Off</span></div>
+                <div>LED Blue: <span id="led-blue-status">Off</span></div>
+                <div>Buzzer: <span id="buzzer-status">Off</span></div>
             </div>
             <button id="update-status" class="btn-primary">Update Status</button>
         </div>
@@ -360,6 +358,18 @@
         document.getElementById('camera-right').addEventListener('click', () => sendCommand('camera_right', {angle: 10}));
         document.getElementById('camera-center').addEventListener('click', () => sendCommand('camera_center'));
 
+        // Full screen camera
+        document.getElementById('fullscreen-btn').addEventListener('click', function() {
+            const img = document.querySelector('.camera-feed');
+            if (img.requestFullscreen) {
+                img.requestFullscreen();
+            } else if (img.webkitRequestFullscreen) {
+                img.webkitRequestFullscreen();
+            } else if (img.msRequestFullscreen) {
+                img.msRequestFullscreen();
+            }
+        });
+
         // Buzzer controls
         document.getElementById('buzzer-on').addEventListener('click', () => sendCommand('buzzer_on', {frequency: 2000}));
         document.getElementById('buzzer-off').addEventListener('click', () => sendCommand('buzzer_off'));
@@ -395,6 +405,13 @@
                 document.getElementById('car-status').textContent = data.car_initialized ? 'Yes' : 'No';
                 document.getElementById('steering-angle').textContent = data.steering_angle;
                 document.getElementById('camera-pan').textContent = data.camera_pan;
+                document.getElementById('camera-tilt').textContent = data.camera_tilt;
+                document.getElementById('current-speed').textContent = data.speed;
+                document.getElementById('current-distance').textContent = data.distance.toFixed(1);
+                document.getElementById('led-red-status').textContent = data.led_red ? 'On' : 'Off';
+                document.getElementById('led-green-status').textContent = data.led_green ? 'On' : 'Off';
+                document.getElementById('led-blue-status').textContent = data.led_blue ? 'On' : 'Off';
+                document.getElementById('buzzer-status').textContent = data.buzzer_active ? 'On' : 'Off';
             } catch (error) {
                 console.error('Error updating status:', error);
             }
@@ -421,106 +438,6 @@
         `;
         document.querySelector('.container').insertBefore(instructions, document.querySelector('.container').firstChild.nextSibling);
 
-        // Map visualization
-        const canvas = document.getElementById('map-canvas');
-        const ctx = canvas.getContext('2d');
-
-        function drawMap(scanPoints) {
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw center point (car position)
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-
-            // Draw car representation
-            ctx.fillStyle = '#007bff';
-            ctx.fillRect(centerX - 10, centerY - 5, 20, 10);
-
-            // Draw scan points
-            for (const [angle, distance] of Object.entries(scanPoints)) {
-                if (distance > 0 && distance < 400) { // Show up to 400cm (4 meters)
-                    const radians = (parseInt(angle) * Math.PI) / 180;
-                    const scale = 1.2; // Scale factor for display (smaller = more zoomed out)
-                    const x = centerX + Math.sin(radians) * (distance * scale);
-                    const y = centerY - Math.cos(radians) * (distance * scale);
-
-                    // Color based on distance (closer = more red)
-                    const intensity = Math.max(0, 255 - (distance * 0.8)); // Adjusted for longer range
-                    ctx.fillStyle = `rgb(${255 - intensity}, ${intensity}, 0)`;
-
-                    // Draw point (larger for better visibility)
-                    ctx.beginPath();
-                    ctx.arc(x, y, 4, 0, 2 * Math.PI);
-                    ctx.fill();
-
-                    // Draw line from center to point
-                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(centerX, centerY);
-                    ctx.lineTo(x, y);
-                    ctx.stroke();
-                }
-            }
-
-            // Draw distance rings
-            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = 1;
-            for (let r = 50; r <= 300; r += 50) { // Up to 300cm
-                const scale = 1.2;
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, r * scale, 0, 2 * Math.PI);
-                ctx.stroke();
-                // Label distances
-                ctx.fillStyle = '#666';
-                ctx.font = '12px Arial';
-                ctx.fillText(`${r}cm`, centerX + r * scale + 5, centerY + 5);
-            }
-        }
-
-        async function updateMap() {
-            try {
-                const response = await fetch('/scan_data');
-                const data = await response.json();
-                drawMap(data.scan_points);
-            } catch (error) {
-                console.error('Error updating map:', error);
-            }
-        }
-
-        document.getElementById('update-map').addEventListener('click', updateMap);
-
-        // 360° rotation scan
-        document.getElementById('rotation-scan').addEventListener('click', async () => {
-            const button = document.getElementById('rotation-scan');
-            const originalText = button.textContent;
-            button.textContent = 'Scanning...';
-            button.disabled = true;
-
-            try {
-                // Trigger rotation mode in scanner
-                const response = await fetch('/start_rotation_scan', { method: 'POST' });
-                const result = await response.json();
-
-                if (result.success) {
-                    console.log('360° rotation scan started');
-                    // Update map immediately to show progress
-                    setTimeout(() => updateMap(), 2000);
-                } else {
-                    console.error('Failed to start rotation scan');
-                }
-            } catch (error) {
-                console.error('Error starting rotation scan:', error);
-            } finally {
-                button.textContent = originalText;
-                button.disabled = false;
-            }
-        });
-
-        // Auto-update map every 1 second (faster for continuous scanning)
-        setInterval(updateMap, 1000);
-
         // Auto-update status and distance every 2 seconds
         setInterval(() => {
             updateDistance();
@@ -529,7 +446,6 @@
 
         // Initial updates
         updateStatus();
-        updateMap();
     </script>
 </body>
 </html>

@@ -23,6 +23,11 @@ class CarControl:
             self.steering_angle = 100
             self.camera_pan = 90
             self.camera_tilt = 90
+            self.current_speed = 0
+            self.led_red_state = False
+            self.led_green_state = False
+            self.led_blue_state = False
+            self.buzzer_state = False
             logger.info("Car control initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize car control: {e}")
@@ -82,6 +87,7 @@ class CarControl:
 
             speed = max(0, min(100, speed))  # Clamp speed to 0-100
             pwm = int(speed * 10)  # Convert to PWM value
+            self.current_speed = speed
 
             if not self.mdev.writeReg(self.mdev.CMD_PWM1, pwm):
                 logger.error("Failed to set speed for right motor")
@@ -93,6 +99,10 @@ class CarControl:
         except Exception as e:
             logger.error(f"Error setting speed: {e}")
             return False
+
+    def get_speed(self):
+        """Get current speed"""
+        return self.current_speed
 
     # Steering methods
     def turn_left(self, degrees=30):
@@ -249,7 +259,10 @@ class CarControl:
                 return False
 
             frequency = max(0, min(65535, int(frequency)))  # Clamp frequency to valid range
-            return self.mdev.setBuzzer(frequency)
+            success = self.mdev.setBuzzer(frequency)
+            if success:
+                self.buzzer_state = True
+            return success
         except Exception as e:
             logger.error(f"Error turning buzzer on: {e}")
             return False
@@ -257,7 +270,10 @@ class CarControl:
     def buzzer_off(self):
         """Turn buzzer off"""
         try:
-            return self.mdev.setBuzzer(0)
+            success = self.mdev.setBuzzer(0)
+            if success:
+                self.buzzer_state = False
+            return success
         except Exception as e:
             logger.error(f"Error turning buzzer off: {e}")
             return False
@@ -266,7 +282,10 @@ class CarControl:
     def led_red_on(self):
         """Turn red LED on"""
         try:
-            return self.mdev.writeReg(self.mdev.CMD_IO1, 0)
+            success = self.mdev.writeReg(self.mdev.CMD_IO1, 0)
+            if success:
+                self.led_red_state = True
+            return success
         except Exception as e:
             logger.error(f"Error turning red LED on: {e}")
             return False
@@ -274,7 +293,10 @@ class CarControl:
     def led_red_off(self):
         """Turn red LED off"""
         try:
-            return self.mdev.writeReg(self.mdev.CMD_IO1, 1)
+            success = self.mdev.writeReg(self.mdev.CMD_IO1, 1)
+            if success:
+                self.led_red_state = False
+            return success
         except Exception as e:
             logger.error(f"Error turning red LED off: {e}")
             return False
@@ -282,7 +304,10 @@ class CarControl:
     def led_green_on(self):
         """Turn green LED on"""
         try:
-            return self.mdev.writeReg(self.mdev.CMD_IO2, 0)
+            success = self.mdev.writeReg(self.mdev.CMD_IO2, 0)
+            if success:
+                self.led_green_state = True
+            return success
         except Exception as e:
             logger.error(f"Error turning green LED on: {e}")
             return False
@@ -290,7 +315,10 @@ class CarControl:
     def led_green_off(self):
         """Turn green LED off"""
         try:
-            return self.mdev.writeReg(self.mdev.CMD_IO2, 1)
+            success = self.mdev.writeReg(self.mdev.CMD_IO2, 1)
+            if success:
+                self.led_green_state = False
+            return success
         except Exception as e:
             logger.error(f"Error turning green LED off: {e}")
             return False
@@ -298,7 +326,10 @@ class CarControl:
     def led_blue_on(self):
         """Turn blue LED on"""
         try:
-            return self.mdev.writeReg(self.mdev.CMD_IO3, 0)
+            success = self.mdev.writeReg(self.mdev.CMD_IO3, 0)
+            if success:
+                self.led_blue_state = True
+            return success
         except Exception as e:
             logger.error(f"Error turning blue LED on: {e}")
             return False
@@ -306,7 +337,10 @@ class CarControl:
     def led_blue_off(self):
         """Turn blue LED off"""
         try:
-            return self.mdev.writeReg(self.mdev.CMD_IO3, 1)
+            success = self.mdev.writeReg(self.mdev.CMD_IO3, 1)
+            if success:
+                self.led_blue_state = False
+            return success
         except Exception as e:
             logger.error(f"Error turning blue LED off: {e}")
             return False
