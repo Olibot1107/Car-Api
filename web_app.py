@@ -187,7 +187,7 @@ def proximity_loop():
                     # Emergency backward movement at high speed
                     car.backward()
                     car.set_speed(80)  # High speed backward
-                    time.sleep(0.5)  # Move back for 0.5 seconds
+                    time.sleep(0.3)  # Move back for 0.5 seconds
                     car.stop()
                     logger.info("Emergency backward movement completed")
 
