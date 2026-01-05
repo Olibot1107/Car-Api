@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, Response
 from flask_cors import CORS
 import logging
+import cv2
 import time
 import threading
 from lib.movement import CarControl
@@ -34,11 +35,6 @@ def init_car():
 
 def generate_camera_feed():
     """Generator function for camera feed"""
-    try:
-        import cv2
-    except ImportError:
-        logger.error("OpenCV not available")
-        return
     camera = cv2.VideoCapture(0)  # Use default camera
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -179,7 +175,7 @@ def stop_proximity_detection():
     logger.info("Proximity detection stopped")
 
 def proximity_loop():
-    """Main proximity detection loop - anti-crash maneuver: back up until >10cm, then forward to 10cm"""
+    """Main proximity detection loop - triggers backward movement when close to obstacles"""
     logger.info("Proximity detection started - monitoring for obstacles within 30cm")
 
     while proximity_running:
@@ -187,32 +183,13 @@ def proximity_loop():
             if car:  # Only monitor if car is available
                 distance = car.get_distance()
                 if distance > 0 and distance < 30:  # Less than 30cm
-                    logger.warning(f"Obstacle detected at {distance:.1f}cm - starting anti-crash maneuver")
-
-                    # Step 1: Go backwards until out of range by 10 (distance > 10cm)
+                    logger.warning(f"Obstacle detected at {distance:.1f}cm - triggering emergency backward movement")
+                    # Emergency backward movement at high speed
                     car.backward()
-                    car.set_speed(50)  # Moderate speed
-                    while distance <= 10 and proximity_running:
-                        time.sleep(0.1)
-                        distance = car.get_distance()
-                        if distance <= 0:
-                            break  # Invalid reading
+                    car.set_speed(80)  # High speed backward
+                    time.sleep(0.5)  # Move back for 0.5 seconds
                     car.stop()
-                    logger.info("Backed up to safe distance")
-
-                    # Step 2: Go forwards until in the +10 spot (distance ~10cm)
-                    if proximity_running:
-                        car.forward()
-                        car.set_speed(15)  # Slow speed for precision
-                        while distance > 10 and proximity_running:
-                            time.sleep(0.1)
-                            distance = car.get_distance()
-                            if distance <= 0:
-                                break  # Invalid reading
-                        car.stop()
-                        logger.info("Moved forward to maintain 10cm distance")
-
-                    logger.info("Anti-crash maneuver completed")
+                    logger.info("Emergency backward movement completed")
 
         except Exception as e:
             logger.error(f"Proximity detection error: {e}")
