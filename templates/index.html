@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Control Web App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .control-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .control-section h2 {
+            margin-top: 0;
+            color: #555;
+        }
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .slider-container input[type="range"] {
+            width: 100%;
+        }
+        .camera-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .camera-feed {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .status-display {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .direction-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 10px;
+            max-width: 200px;
+            margin: 20px auto;
+        }
+        .direction-controls button {
+            padding: 15px;
+            font-size: 18px;
+        }
+        .center-btn {
+            grid-column: 2;
+            grid-row: 2;
+        }
+        .sensor-display {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 10px 0;
+        }
+        .led-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .led-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #ddd;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .led-btn.active {
+            border-color: #333;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .red-led { background-color: #ff4444; }
+        .green-led { background-color: #44ff44; }
+        .blue-led { background-color: #4444ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Car Control Web App</h1>
+
+        <!-- Camera Feed (Coming Soon) -->
+        <div class="control-section">
+            <h2>📹 Camera Feed</h2>
+            <div class="camera-container" style="text-align: center; padding: 40px; background-color: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 5px;">
+                <p style="margin: 0; color: #6c757d; font-size: 18px;">📷 Camera streaming coming soon...</p>
+            </div>
+        </div>
+
+        <!-- Movement Controls -->
+        <div class="control-section">
+            <h2>🚙 Movement Controls</h2>
+
+            <div class="slider-container">
+                <label for="speed-slider">Speed: <span id="speed-value">50</span>%</label>
+                <input type="range" id="speed-slider" min="0" max="100" value="50">
+            </div>
+
+            <div class="direction-controls">
+                <button id="forward-left" class="btn-primary">↖</button>
+                <button id="forward" class="btn-primary">↑</button>
+                <button id="forward-right" class="btn-primary">↗</button>
+
+                <button id="turn-left" class="btn-warning">←</button>
+                <button id="stop" class="btn-danger center-btn">■</button>
+                <button id="turn-right" class="btn-warning">→</button>
+
+                <button id="backward-left" class="btn-primary">↙</button>
+                <button id="backward" class="btn-primary">↓</button>
+                <button id="backward-right" class="btn-primary">↘</button>
+            </div>
+
+            <div style="text-align: center; margin: 10px 0;">
+                <button id="center-steering" class="btn-success">Center Steering</button>
+            </div>
+        </div>
+
+        <!-- Camera Controls -->
+        <div class="control-section">
+            <h2>📷 Camera Controls</h2>
+
+            <div class="control-grid">
+                <button id="camera-up" class="btn-primary">↑ Up</button>
+                <button id="camera-center" class="btn-success">⊕ Center</button>
+                <button id="camera-down" class="btn-primary">↓ Down</button>
+                <button id="camera-left" class="btn-primary">← Left</button>
+                <button id="camera-right" class="btn-primary">→ Right</button>
+            </div>
+        </div>
+
+        <!-- Sensors -->
+        <div class="control-section">
+            <h2>📊 Sensors</h2>
+            <div class="sensor-display">
+                Distance: <span id="distance-display">0</span> cm
+            </div>
+            <button id="update-distance" class="btn-primary">Update Distance</button>
+        </div>
+
+        <!-- Outputs -->
+        <div class="control-section">
+            <h2>💡 Outputs</h2>
+
+            <div style="margin: 15px 0;">
+                <h3>Buzzer</h3>
+                <button id="buzzer-on" class="btn-warning">🔊 Buzzer On</button>
+                <button id="buzzer-off" class="btn-secondary">🔇 Buzzer Off</button>
+            </div>
+
+            <div>
+                <h3>LEDs</h3>
+                <div class="led-controls">
+                    <button id="led-red" class="led-btn red-led" data-led="red"></button>
+                    <button id="led-green" class="led-btn green-led" data-led="green"></button>
+                    <button id="led-blue" class="led-btn blue-led" data-led="blue"></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="control-section">
+            <h2>📋 Status</h2>
+            <div class="status-display">
+                <div>Car Initialized: <span id="car-status">Checking...</span></div>
+                <div>Steering Angle: <span id="steering-angle">0</span>°</div>
+                <div>Camera Pan: <span id="camera-pan">0</span>°</div>
+                <div>Camera Tilt: <span id="camera-tilt">0</span>°</div>
+            </div>
+            <button id="update-status" class="btn-primary">Update Status</button>
+        </div>
+    </div>
+
+    <script>
+        // Speed slider
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+
+        speedSlider.addEventListener('input', function() {
+            speedValue.textContent = this.value;
+        });
+
+        // Control functions
+        async function sendCommand(action, data = {}) {
+            try {
+                data.speed = parseInt(speedSlider.value);
+                const response = await fetch(`/control/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    console.error('Command failed:', result.error);
+                    alert('Command failed: ' + (result.error || 'Unknown error'));
+                }
+                return result;
+            } catch (error) {
+                console.error('Network error:', error);
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        // Movement controls
+        document.getElementById('forward').addEventListener('click', () => sendCommand('forward'));
+        document.getElementById('backward').addEventListener('click', () => sendCommand('backward'));
+        document.getElementById('stop').addEventListener('click', () => sendCommand('stop'));
+        document.getElementById('turn-left').addEventListener('click', () => sendCommand('turn_left', {angle: 30}));
+        document.getElementById('turn-right').addEventListener('click', () => sendCommand('turn_right', {angle: 30}));
+        document.getElementById('center-steering').addEventListener('click', () => sendCommand('center_steering'));
+
+        // Camera controls
+        document.getElementById('camera-up').addEventListener('click', () => sendCommand('camera_up', {angle: 10}));
+        document.getElementById('camera-down').addEventListener('click', () => sendCommand('camera_down', {angle: 10}));
+        document.getElementById('camera-left').addEventListener('click', () => sendCommand('camera_left', {angle: 10}));
+        document.getElementById('camera-right').addEventListener('click', () => sendCommand('camera_right', {angle: 10}));
+        document.getElementById('camera-center').addEventListener('click', () => sendCommand('camera_center'));
+
+        // Buzzer controls
+        document.getElementById('buzzer-on').addEventListener('click', () => sendCommand('buzzer_on', {frequency: 2000}));
+        document.getElementById('buzzer-off').addEventListener('click', () => sendCommand('buzzer_off'));
+
+        // LED controls
+        document.querySelectorAll('.led-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const led = this.dataset.led;
+                const isActive = this.classList.contains('active');
+                this.classList.toggle('active');
+                sendCommand(`led_${led}`, {state: !isActive});
+            });
+        });
+
+        // Sensor updates
+        async function updateDistance() {
+            try {
+                const response = await fetch('/sensor/distance');
+                const data = await response.json();
+                document.getElementById('distance-display').textContent = data.distance.toFixed(1);
+            } catch (error) {
+                console.error('Error updating distance:', error);
+            }
+        }
+
+        document.getElementById('update-distance').addEventListener('click', updateDistance);
+
+        // Status updates
+        async function updateStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                document.getElementById('car-status').textContent = data.car_initialized ? 'Yes' : 'No';
+                document.getElementById('steering-angle').textContent = data.steering_angle;
+                document.getElementById('camera-pan').textContent = data.camera_pan;
+                document.getElementById('camera-tilt').textContent = data.camera_tilt;
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
+        }
+
+        document.getElementById('update-status').addEventListener('click', updateStatus);
+
+        // Auto-update distance and status every 2 seconds
+        setInterval(() => {
+            updateDistance();
+            updateStatus();
+        }, 2000);
+
+        // Initial status update
+        updateStatus();
+    </script>
+</body>
+</html>

@@ -1,5 +1,16 @@
 import logging
-from Server.mDev import mDEV, numMap
+
+# Try to import hardware mDev, fall back to mock version
+try:
+    from Server.mDev import mDEV, numMap
+    HARDWARE_AVAILABLE = True
+except ImportError:
+    try:
+        from Server.mock_mdev import mDEV, numMap
+        HARDWARE_AVAILABLE = False
+        logging.getLogger(__name__).warning("Using mock hardware interface - no real hardware control")
+    except ImportError:
+        raise ImportError("Neither hardware mDev nor mock_mdev could be imported")
 
 # Set up logging
 logger = logging.getLogger(__name__)
