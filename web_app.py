@@ -19,7 +19,7 @@ scanner_thread = None
 scanner_running = False
 scan_data = {}  # Store scan points: {angle: distance}
 current_scan_angle = 0
-scan_step = 30  # degrees between scan points
+scan_step = 15  # degrees between scan points (more points!)
 scan_range = (-90, 90)  # scan from -90 to +90 degrees
 
 def init_car():

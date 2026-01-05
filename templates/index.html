@@ -438,18 +438,19 @@
 
             // Draw scan points
             for (const [angle, distance] of Object.entries(scanPoints)) {
-                if (distance > 0 && distance < 200) { // Only show reasonable distances
+                if (distance > 0 && distance < 400) { // Show up to 400cm (4 meters)
                     const radians = (parseInt(angle) * Math.PI) / 180;
-                    const x = centerX + Math.sin(radians) * (distance * 2); // Scale for display
-                    const y = centerY - Math.cos(radians) * (distance * 2);
+                    const scale = 1.2; // Scale factor for display (smaller = more zoomed out)
+                    const x = centerX + Math.sin(radians) * (distance * scale);
+                    const y = centerY - Math.cos(radians) * (distance * scale);
 
                     // Color based on distance (closer = more red)
-                    const intensity = Math.max(0, 255 - (distance * 2.5));
+                    const intensity = Math.max(0, 255 - (distance * 0.8)); // Adjusted for longer range
                     ctx.fillStyle = `rgb(${255 - intensity}, ${intensity}, 0)`;
 
-                    // Draw point
+                    // Draw point (larger for better visibility)
                     ctx.beginPath();
-                    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                    ctx.arc(x, y, 4, 0, 2 * Math.PI);
                     ctx.fill();
 
                     // Draw line from center to point
@@ -465,14 +466,15 @@
             // Draw distance rings
             ctx.strokeStyle = 'rgba(0,0,0,0.1)';
             ctx.lineWidth = 1;
-            for (let r = 50; r <= 150; r += 50) {
+            for (let r = 50; r <= 300; r += 50) { // Up to 300cm
+                const scale = 1.2;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, r * 2, 0, 2 * Math.PI);
+                ctx.arc(centerX, centerY, r * scale, 0, 2 * Math.PI);
                 ctx.stroke();
                 // Label distances
                 ctx.fillStyle = '#666';
                 ctx.font = '12px Arial';
-                ctx.fillText(`${r}cm`, centerX + r * 2 + 5, centerY + 5);
+                ctx.fillText(`${r}cm`, centerX + r * scale + 5, centerY + 5);
             }
         }
 
