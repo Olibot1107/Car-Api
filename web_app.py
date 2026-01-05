@@ -176,6 +176,7 @@ def stop_scanner():
 
 def scanner_loop():
     """Main scanning loop - movement-aware high-speed scanning"""
+    global movement_detected  # Declare global at function start
     logger.info("Movement-aware scanner started")
     data_history = {}  # Store multiple readings for averaging
     last_steering_angle = 0
@@ -265,7 +266,6 @@ def scanner_loop():
                     time.sleep(0.5)  # Slower cycle when stationary (500ms)
 
                 # Reset movement detection
-                global movement_detected
                 movement_detected = False
 
         except Exception as e:
