@@ -31,7 +31,7 @@ class AutonomousMapper:
         self.current_heading = 0  # Starting direction (degrees)
         self.map_resolution = 10  # cm per grid cell
         self.scan_range = (-90, 90)  # degrees
-        self.scan_step = 15  # degrees between scans
+        self.scan_step = 5  # degrees between scans (higher resolution!)
         self.mapping_thread = None
 
         # Navigation parameters
@@ -39,6 +39,18 @@ class AutonomousMapper:
         self.turn_angle = 45  # degrees to turn when avoiding obstacles
         self.move_distance = 30  # cm to move forward each step
         self.speed = 25  # movement speed (0-100)
+
+        # Exploration parameters for small spaces
+        self.small_space_threshold = 80  # cm - consider space "small" if clearance < this
+        self.small_move_distance = 15  # cm - smaller moves in tight spaces
+        self.gap_exploration_enabled = True
+
+        # Completion detection
+        self.explored_positions = set()  # Track visited positions
+        self.consecutive_turns = 0  # Count consecutive turns (indicates being stuck)
+        self.max_consecutive_turns = 5  # Stop if stuck turning too many times
+        self.map_stability_counter = 0  # Count stable map periods
+        self.completion_threshold = 10  # Stop after this many stable periods
 
         logger.info("Autonomous Mapper initialized")
 
@@ -172,14 +184,30 @@ class AutonomousMapper:
 
     def _plan_next_move(self, scan_data):
         """Plan the next movement based on scan data"""
+        # Check for completion first
+        if self._check_completion():
+            logger.info("Mapping completion detected - exploration finished!")
+            return {'action': 'complete'}
+
         # Find the clearest direction to move
         best_angle = 0
         best_score = 0
+        gap_found = False
 
         # Evaluate each possible direction
         for angle in range(-90, 91, 30):  # Check every 30 degrees
             # Calculate score based on clearance in that direction
             clearance_score = self._calculate_clearance(scan_data, angle)
+
+            # Special handling for gaps/small spaces
+            if self.gap_exploration_enabled:
+                gap_score = self._detect_gap(scan_data, angle)
+                if gap_score > 0:
+                    # Found a potential gap/small space
+                    clearance_score += gap_score * 2  # Prioritize gaps
+                    gap_found = True
+                    logger.debug(f"Gap detected at {angle}° with score {gap_score}")
+
             if clearance_score > best_score:
                 best_score = clearance_score
                 best_angle = angle
@@ -187,10 +215,29 @@ class AutonomousMapper:
         # Determine action based on best direction
         if best_score < self.safe_distance:
             # No safe direction found, turn in place
+            self.consecutive_turns += 1
+            if self.consecutive_turns >= self.max_consecutive_turns:
+                logger.warning("Too many consecutive turns - may be stuck")
+                return {'action': 'complete'}
             return {'action': 'turn', 'angle': self.turn_angle}
         else:
+            # Reset consecutive turns counter
+            self.consecutive_turns = 0
+
+            # Determine move distance based on space available
+            move_distance = self.move_distance
+            if best_score < self.small_space_threshold:
+                # In a small space, use smaller moves
+                move_distance = self.small_move_distance
+                logger.debug(f"Small space detected - using {move_distance}cm moves")
+
+            if gap_found:
+                # Exploring a gap - be more cautious
+                move_distance = min(move_distance, 20)  # Limit moves in gaps
+                logger.debug(f"Exploring gap - cautious {move_distance}cm move")
+
             # Move in the best direction
-            return {'action': 'move', 'angle': best_angle, 'distance': self.move_distance}
+            return {'action': 'move', 'angle': best_angle, 'distance': move_distance}
 
     def _calculate_clearance(self, scan_data, target_angle):
         """Calculate clearance score for a given direction"""
@@ -248,6 +295,78 @@ class AutonomousMapper:
             )
 
         logger.debug(f"Position: {self.current_position}, Heading: {self.current_heading}°")
+
+    def _detect_gap(self, scan_data, target_angle):
+        """Detect potential gaps or small spaces in the given direction"""
+        if not self.gap_exploration_enabled:
+            return 0
+
+        # Look for patterns that indicate gaps (narrow openings between obstacles)
+        gap_score = 0
+
+        # Check readings around the target angle
+        readings_in_cone = []
+        for scan_angle, distance in scan_data.items():
+            angle_diff = abs(scan_angle - target_angle)
+            if angle_diff <= 45:  # Wider cone for gap detection
+                readings_in_cone.append((scan_angle, distance))
+
+        if len(readings_in_cone) < 3:
+            return 0
+
+        # Sort by angle
+        readings_in_cone.sort(key=lambda x: x[0])
+
+        # Look for gap patterns: areas where distance suddenly increases
+        for i in range(1, len(readings_in_cone) - 1):
+            prev_dist = readings_in_cone[i-1][1]
+            curr_dist = readings_in_cone[i][1]
+            next_dist = readings_in_cone[i+1][1]
+
+            # Gap detection: current reading much farther than neighbors
+            if curr_dist > prev_dist + 30 and curr_dist > next_dist + 30:
+                gap_score += (curr_dist - max(prev_dist, next_dist)) / 10  # Score based on gap size
+
+            # Small space detection: consistently closer readings
+            elif curr_dist < self.small_space_threshold:
+                gap_score += (self.small_space_threshold - curr_dist) / 20  # Smaller bonus for small spaces
+
+        return gap_score
+
+    def _check_completion(self):
+        """Check if mapping is complete based on exploration patterns"""
+        # Method 1: Too many consecutive turns (stuck)
+        if self.consecutive_turns >= self.max_consecutive_turns:
+            logger.info("Completion detected: Too many consecutive turns (stuck)")
+            return True
+
+        # Method 2: Map stability - if map hasn't changed much recently
+        current_cells = len(self.map_data)
+        if hasattr(self, '_last_cell_count'):
+            if current_cells == self._last_cell_count:
+                self.map_stability_counter += 1
+                if self.map_stability_counter >= self.completion_threshold:
+                    logger.info(f"Completion detected: Map stable for {self.completion_threshold} cycles")
+                    return True
+            else:
+                self.map_stability_counter = 0
+
+        self._last_cell_count = current_cells
+
+        # Method 3: Position revisiting - if we've explored the same areas repeatedly
+        current_pos_key = (round(self.current_position[0]), round(self.current_position[1]))
+        if current_pos_key in self.explored_positions:
+            if not hasattr(self, '_position_visit_count'):
+                self._position_visit_count = {}
+            self._position_visit_count[current_pos_key] = self._position_visit_count.get(current_pos_key, 0) + 1
+
+            if self._position_visit_count[current_pos_key] >= 3:  # Visited same position 3+ times
+                logger.info("Completion detected: Revisiting same positions repeatedly")
+                return True
+
+        self.explored_positions.add(current_pos_key)
+
+        return False
 
 
 # Flask routes for autonomous mapper web interface
