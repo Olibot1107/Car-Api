@@ -143,9 +143,44 @@
         .red-led { background-color: #ff4444; }
         .green-led { background-color: #44ff44; }
         .blue-led { background-color: #4444ff; }
+
+        /* Emergency stop button - always visible */
+        .emergency-stop {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background-color: #ff0000;
+            border: 3px solid #cc0000;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .emergency-stop:hover {
+            background-color: #cc0000;
+            transform: scale(1.05);
+        }
+        .emergency-stop:active {
+            transform: scale(0.95);
+        }
+        .emergency-stop.fullscreen {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10001;
+        }
     </style>
 </head>
 <body>
+    <!-- Emergency Stop Button - Always Visible -->
+    <button id="emergency-stop" class="emergency-stop" title="Emergency Stop (Spacebar)">STOP</button>
+
     <div class="container">
         <h1>🚗 Car Control Web App</h1>
 
@@ -344,6 +379,9 @@
                 }
             }
         }
+
+        // Emergency stop button
+        document.getElementById('emergency-stop').addEventListener('click', () => sendCommand('stop'));
 
         // Button controls (still available for touch devices)
         document.getElementById('forward').addEventListener('click', () => sendCommand('forward'));

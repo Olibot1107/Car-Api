@@ -56,7 +56,7 @@ def generate_camera_feed():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-            time.sleep(0.05)  # Control frame rate - faster (20 FPS)
+            time.sleep(0.02)  # Control frame rate - faster (50 FPS)
     finally:
         camera.release()
 
@@ -154,50 +154,9 @@ def status():
         'buzzer_active': car.buzzer_state if car and hasattr(car, 'buzzer_state') else False
     })
 
-def start_proximity_detection():
-    """Start the proximity detection thread"""
-    global proximity_thread, proximity_running
-    if proximity_running:
-        logger.warning("Proximity detection already running")
-        return
 
-    proximity_running = True
-    proximity_thread = threading.Thread(target=proximity_loop, daemon=True)
-    proximity_thread.start()
-    logger.info("Proximity detection started")
-
-def stop_proximity_detection():
-    """Stop the proximity detection thread"""
-    global proximity_running
-    proximity_running = False
-    if proximity_thread:
-        proximity_thread.join(timeout=1.0)
-    logger.info("Proximity detection stopped")
-
-def proximity_loop():
-    """Main proximity detection loop - triggers backward movement when close to obstacles"""
-    logger.info("Proximity detection started - monitoring for obstacles within 30cm")
-
-    while proximity_running:
-        try:
-            if car:  # Only monitor if car is available
-                distance = car.get_distance()
-                if distance > 0 and distance < 30:  # Less than 30cm
-                    logger.warning(f"Obstacle detected at {distance:.1f}cm - triggering emergency backward movement")
-                    # Emergency backward movement at high speed
-                    car.backward()
-                    car.set_speed(80)  # High speed backward
-                    time.sleep(0.3)  # Move back for 0.5 seconds
-                    car.stop()
-                    logger.info("Emergency backward movement completed")
-
-        except Exception as e:
-            logger.error(f"Proximity detection error: {e}")
-
-        time.sleep(0.1)  # Check every 100ms
 
 if __name__ == '__main__':
-    if init_car():
-        start_proximity_detection()  # Start proximity detection if car initialized
+    init_car()
     logger.info("Starting web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
