@@ -5,6 +5,7 @@ import cv2
 import time
 import threading
 from lib.movement import CarControl
+from autonomous_mapper import create_autonomous_mapper, start_house_mapping, stop_house_mapping, get_house_map
 
 app = Flask(__name__)
 CORS(app)
@@ -23,6 +24,9 @@ scan_step = 15  # degrees between scan points (more points!)
 scan_range = (-90, 90)  # scan from -90 to +90 degrees
 last_movement_time = 0  # Track when car last moved
 movement_detected = False
+
+# Autonomous mapping system
+mapper = None
 
 def init_car():
     global car
