@@ -25,72 +25,109 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main demo function"""
-    logger.info("Starting car movement demo")
+    logger.info("Starting enhanced car movement demo with camera and steering")
 
     try:
         # Initialize car control
         car = CarControl()
         logger.info("Car control initialized successfully")
 
-        # Move forward for 4 seconds
-        logger.info("Moving forward for 4 seconds...")
-        if car.forward():
-            logger.info("Forward movement started")
-        else:
+        # Center camera and steering
+        logger.info("Centering camera and steering...")
+        car.camera_center()
+        car.center_steering()
+        time.sleep(1)
+
+        # Phase 1: Move forward while panning camera and steering left, accelerating to 100%
+        logger.info("Phase 1: Moving forward with camera pan and steering left, accelerating to 100%...")
+        if not car.forward():
             logger.error("Failed to start forward movement")
             return
 
-        if car.set_speed(50):  # 50% speed
-            logger.info("Speed set to 50%")
-        else:
-            logger.error("Failed to set speed")
-            return
+        # Accelerate from 20% to 100% over time
+        for speed in range(20, 101, 10):  # 20, 30, 40, ..., 100
+            if not car.set_speed(speed):
+                logger.error(f"Failed to set speed to {speed}%")
+                return
+            logger.info(f"Speed set to {speed}%")
 
-        time.sleep(4)
+            # Pan camera left while accelerating
+            car.camera_left(5)
+            time.sleep(0.3)
 
-        # Stop
-        logger.info("Stopping car...")
-        if car.stop():
-            logger.info("Car stopped")
-        else:
-            logger.error("Failed to stop car")
-            return
+        # Turn steering left while at full speed
+        car.turn_left(45)
+        time.sleep(2)
 
-        time.sleep(2)  # Pause for 2 seconds
+        # Phase 2: Continue forward, center steering, pan camera right
+        logger.info("Phase 2: Centering steering and panning camera right...")
+        car.center_steering()
+        time.sleep(1)
 
-        # Move backward for 4 seconds
-        logger.info("Moving backward for 4 seconds...")
-        if car.backward():
-            logger.info("Backward movement started")
-        else:
+        # Pan camera to the right
+        for _ in range(10):
+            car.camera_right(5)
+            time.sleep(0.2)
+
+        time.sleep(2)
+
+        # Phase 3: Slow down and turn right, tilt camera up
+        logger.info("Phase 3: Slowing down, turning right, and tilting camera up...")
+        car.set_speed(50)
+        car.turn_right(45)
+        time.sleep(1)
+
+        # Tilt camera up
+        for _ in range(8):
+            car.camera_up(5)
+            time.sleep(0.3)
+
+        time.sleep(2)
+
+        # Phase 4: Move backward with camera tilt down and steering right, accelerating to 100%
+        logger.info("Phase 4: Moving backward with camera tilt down and steering right, accelerating to 100%...")
+        if not car.backward():
             logger.error("Failed to start backward movement")
             return
 
-        if car.set_speed(50):  # 50% speed
-            logger.info("Speed set to 50%")
-        else:
-            logger.error("Failed to set speed")
-            return
+        # Accelerate backward from 20% to 100%
+        for speed in range(20, 101, 10):
+            if not car.set_speed(speed):
+                logger.error(f"Failed to set speed to {speed}%")
+                return
+            logger.info(f"Speed set to {speed}%")
 
-        time.sleep(4)
+            # Tilt camera down while accelerating backward
+            car.camera_down(5)
+            time.sleep(0.3)
+
+        # Adjust steering right
+        car.turn_right(30)
+        time.sleep(3)
 
         # Final stop
-        logger.info("Stopping car...")
-        if car.stop():
-            logger.info("Car stopped - demo complete")
-        else:
+        logger.info("Stopping car - demo complete")
+        if not car.stop():
             logger.error("Failed to stop car")
+
+        # Return camera and steering to center
+        car.camera_center()
+        car.center_steering()
 
     except KeyboardInterrupt:
         logger.info("Demo interrupted by user")
         try:
             car.stop()
+            car.camera_center()
+            car.center_steering()
         except:
             pass
     except Exception as e:
         logger.error(f"Demo failed: {e}")
         try:
             car.stop()
+            car.camera_center()
+            car.center_steering()
         except:
             pass
 
