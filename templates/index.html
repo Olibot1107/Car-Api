@@ -164,6 +164,7 @@
                 <canvas id="map-canvas" width="400" height="400"></canvas>
                 <div style="text-align: center; margin-top: 10px;">
                     <button id="update-map" class="btn-primary">Update Map</button>
+                    <button id="rotation-scan" class="btn-warning" style="margin-left: 10px;">360° Scan</button>
                 </div>
             </div>
         </div>
@@ -489,6 +490,33 @@
         }
 
         document.getElementById('update-map').addEventListener('click', updateMap);
+
+        // 360° rotation scan
+        document.getElementById('rotation-scan').addEventListener('click', async () => {
+            const button = document.getElementById('rotation-scan');
+            const originalText = button.textContent;
+            button.textContent = 'Scanning...';
+            button.disabled = true;
+
+            try {
+                // Trigger rotation mode in scanner
+                const response = await fetch('/start_rotation_scan', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log('360° rotation scan started');
+                    // Update map immediately to show progress
+                    setTimeout(() => updateMap(), 2000);
+                } else {
+                    console.error('Failed to start rotation scan');
+                }
+            } catch (error) {
+                console.error('Error starting rotation scan:', error);
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        });
 
         // Auto-update map every 1 second (faster for continuous scanning)
         setInterval(updateMap, 1000);

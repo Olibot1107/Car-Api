@@ -175,58 +175,72 @@ def stop_scanner():
     logger.info("Ultrasonic scanner stopped")
 
 def scanner_loop():
-    """Main scanning loop - movement-aware high-speed scanning"""
+    """Main scanning loop - continuous 360° rotation scanning"""
     global movement_detected  # Declare global at function start
-    logger.info("Movement-aware scanner started")
-    data_history = {}  # Store multiple readings for averaging
-    last_steering_angle = 0
-    movement_scan_count = 0
+    logger.info("360° rotation scanner started")
+    rotation_scan_count = 0
 
     while scanner_running:
         try:
             if car:  # Only scan if car is available
-                current_steering = car.get_steering()
-                steering_changed = abs(current_steering - last_steering_angle) > 5  # 5° threshold
+                # Check if rotation scanning was requested
+                if movement_detected and getattr(scanner_loop, 'rotation_mode', False):
+                    # Full 360° rotation scanning mode
+                    logger.info("Starting 360° rotation scan for 900+ data points")
+                    rotation_scan_count += 1
 
-                # Detect movement/turning
-                is_moving = steering_changed or movement_detected
-                last_steering_angle = current_steering
+                    # Clear previous scan data for fresh rotation scan
+                    scan_data.clear()
 
-                if is_moving:
-                    # Movement detected - ULTRA-HIGH RESOLUTION scanning for 900+ points
-                    logger.debug("Movement detected - ULTRA-HIGH RESOLUTION scanning mode")
-                    movement_scan_count += 1
+                    # Set camera to forward position for rotation
+                    car.camera_center()
 
-                    # Ultra-fine scanning for massive data collection
-                    ultra_step = 0.25  # 0.25° steps = 4 points per degree
-                    ultra_range = (-135, 135)  # Even wider range: 270° total
+                    # Start slow rotation
+                    rotation_speed = 20  # Slow speed for controlled rotation (0-100)
+                    car.set_speed(rotation_speed)
 
-                    for angle in range(int(ultra_range[0] * 4), int(ultra_range[1] * 4) + 1):
-                        real_angle = angle / 4.0  # Convert back to degrees
+                    # Begin rotation (one wheel forward, one backward for spin)
+                    # This creates a slow spinning motion
+                    car.mdev.writeReg(car.mdev.CMD_DIR1, 0)  # Right wheel forward
+                    car.mdev.writeReg(car.mdev.CMD_DIR2, 1)  # Left wheel backward (for spin)
+                    car.mdev.writeReg(car.mdev.CMD_PWM1, rotation_speed)
+                    car.mdev.writeReg(car.mdev.CMD_PWM2, rotation_speed)
+
+                    # Collect data during full rotation
+                    points_collected = 0
+                    start_time = time.time()
+                    rotation_duration = 8.0  # 8 seconds for full 360° rotation
+
+                    while points_collected < 900 and (time.time() - start_time) < rotation_duration:
                         if not scanner_running:
                             break
 
-                        # Move camera/sensor to this precise angle
-                        car.set_camera_pan(90 + real_angle)
-                        time.sleep(0.01)  # Ultra-fast servo movement (10ms)
+                        # Calculate current rotation angle (estimate based on time)
+                        elapsed = time.time() - start_time
+                        current_angle = (elapsed / rotation_duration) * 360.0
 
-                        # Take single high-speed reading for maximum data rate
+                        # Take distance reading at current rotation position
                         dist = car.get_distance()
                         if dist > 0:
-                            # Direct data storage for maximum speed (no averaging during ultra-scan)
-                            scan_data[real_angle] = dist
+                            # Store with rotation angle as key
+                            scan_data[current_angle] = dist
+                            points_collected += 1
 
-                            # Only debug log every 10th point to avoid spam
-                            if int(real_angle * 4) % 40 == 0:  # Every 10°
-                                logger.debug(f"Ultra-scan {real_angle:.1f}°: {dist:.1f}cm")
+                            # Log progress every 100 points
+                            if points_collected % 100 == 0:
+                                logger.info(f"Rotation scan: {points_collected}/900 points collected")
 
-                    logger.info(f"Ultra-scan complete: {len(scan_data)} data points collected")
+                        time.sleep(0.008)  # ~125 readings/second for 900 points in 7.2 seconds
 
-                    time.sleep(0.1)  # Very fast cycle during movement (100ms)
+                    # Stop rotation
+                    car.stop()
+                    car.camera_center()  # Return camera to center
+
+                    logger.info(f"360° rotation scan complete: {len(scan_data)} data points collected")
+                    setattr(scanner_loop, 'rotation_mode', False)  # Reset rotation mode
 
                 else:
-                    # Normal scanning when stationary
-                    # Scan with normal parameters
+                    # Normal stationary scanning
                     for angle in range(scan_range[0], scan_range[1] + 1, scan_step):
                         if not scanner_running:
                             break
@@ -246,18 +260,9 @@ def scanner_loop():
                         # Calculate average for cleaner data
                         if readings:
                             avg_distance = sum(readings) / len(readings)
-                            # Simple moving average with history
-                            if angle not in data_history:
-                                data_history[angle] = []
-                            data_history[angle].append(avg_distance)
-                            # Keep only last 3 readings for smoothing
-                            if len(data_history[angle]) > 3:
-                                data_history[angle].pop(0)
+                            scan_data[angle] = avg_distance
 
-                            # Final smoothed value
-                            scan_data[angle] = sum(data_history[angle]) / len(data_history[angle])
-
-                            logger.debug(f"Stationary scan {angle}°: {scan_data[angle]:.1f}cm (avg of {len(readings)} readings)")
+                            logger.debug(f"Stationary scan {angle}°: {avg_distance:.1f}cm")
 
                     # Return camera to center after scan
                     car.camera_center()
@@ -281,6 +286,18 @@ def get_scan_data():
         'scan_range': scan_range,
         'timestamp': time.time()
     })
+
+@app.route('/start_rotation_scan', methods=['POST'])
+def start_rotation_scan():
+    """Trigger a 360° rotation scan"""
+    try:
+        # Set rotation mode flag for the scanner
+        setattr(scanner_loop, 'rotation_mode', True)
+        logger.info("360° rotation scan triggered")
+        return jsonify({'success': True, 'message': 'Rotation scan started'})
+    except Exception as e:
+        logger.error(f"Failed to start rotation scan: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     if init_car():
