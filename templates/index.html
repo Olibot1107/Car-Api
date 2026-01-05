@@ -196,7 +196,14 @@
             </div>
         </div>
 
-
+        <!-- Sensors -->
+        <div class="control-section">
+            <h2>📊 Sensors</h2>
+            <div class="sensor-display">
+                Distance: <span id="distance-display">0</span> cm
+            </div>
+            <button id="update-distance" class="btn-primary">Update Distance</button>
+        </div>
 
         <!-- Outputs -->
         <div class="control-section">
@@ -355,7 +362,18 @@
             });
         });
 
+        // Sensor updates
+        async function updateDistance() {
+            try {
+                const response = await fetch('/sensor/distance');
+                const data = await response.json();
+                document.getElementById('distance-display').textContent = data.distance.toFixed(1);
+            } catch (error) {
+                console.error('Error updating distance:', error);
+            }
+        }
 
+        document.getElementById('update-distance').addEventListener('click', updateDistance);
 
         // Status updates
         async function updateStatus() {
@@ -391,8 +409,9 @@
         `;
         document.querySelector('.container').insertBefore(instructions, document.querySelector('.container').firstChild.nextSibling);
 
-        // Auto-update status every 2 seconds
+        // Auto-update status and distance every 2 seconds
         setInterval(() => {
+            updateDistance();
             updateStatus();
         }, 2000);
 
