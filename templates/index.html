@@ -190,22 +190,13 @@
             <h2>📷 Camera Controls</h2>
 
             <div class="control-grid">
-                <button id="camera-up" class="btn-primary">↑ Up</button>
                 <button id="camera-center" class="btn-success">⊕ Center</button>
-                <button id="camera-down" class="btn-primary">↓ Down</button>
                 <button id="camera-left" class="btn-primary">← Left</button>
                 <button id="camera-right" class="btn-primary">→ Right</button>
             </div>
         </div>
 
-        <!-- Sensors -->
-        <div class="control-section">
-            <h2>📊 Sensors</h2>
-            <div class="sensor-display">
-                Distance: <span id="distance-display">0</span> cm
-            </div>
-            <button id="update-distance" class="btn-primary">Update Distance</button>
-        </div>
+
 
         <!-- Outputs -->
         <div class="control-section">
@@ -234,7 +225,6 @@
                 <div>Car Initialized: <span id="car-status">Checking...</span></div>
                 <div>Steering Angle: <span id="steering-angle">0</span>°</div>
                 <div>Camera Pan: <span id="camera-pan">0</span>°</div>
-                <div>Camera Tilt: <span id="camera-tilt">0</span>°</div>
             </div>
             <button id="update-status" class="btn-primary">Update Status</button>
         </div>
@@ -304,13 +294,7 @@
                 case 'd':
                     sendCommand('turn_right', {angle: 30});
                     break;
-                // Arrow keys for camera
-                case 'arrowup':
-                    sendCommand('camera_up', {angle: 10});
-                    break;
-                case 'arrowdown':
-                    sendCommand('camera_down', {angle: 10});
-                    break;
+                // Arrow keys for camera (only left/right)
                 case 'arrowleft':
                     sendCommand('camera_left', {angle: 10});
                     break;
@@ -346,8 +330,6 @@
         document.getElementById('center-steering').addEventListener('click', () => sendCommand('center_steering'));
 
         // Camera controls
-        document.getElementById('camera-up').addEventListener('click', () => sendCommand('camera_up', {angle: 10}));
-        document.getElementById('camera-down').addEventListener('click', () => sendCommand('camera_down', {angle: 10}));
         document.getElementById('camera-left').addEventListener('click', () => sendCommand('camera_left', {angle: 10}));
         document.getElementById('camera-right').addEventListener('click', () => sendCommand('camera_right', {angle: 10}));
         document.getElementById('camera-center').addEventListener('click', () => sendCommand('camera_center'));
@@ -366,18 +348,7 @@
             });
         });
 
-        // Sensor updates
-        async function updateDistance() {
-            try {
-                const response = await fetch('/sensor/distance');
-                const data = await response.json();
-                document.getElementById('distance-display').textContent = data.distance.toFixed(1);
-            } catch (error) {
-                console.error('Error updating distance:', error);
-            }
-        }
 
-        document.getElementById('update-distance').addEventListener('click', updateDistance);
 
         // Status updates
         async function updateStatus() {
@@ -387,7 +358,6 @@
                 document.getElementById('car-status').textContent = data.car_initialized ? 'Yes' : 'No';
                 document.getElementById('steering-angle').textContent = data.steering_angle;
                 document.getElementById('camera-pan').textContent = data.camera_pan;
-                document.getElementById('camera-tilt').textContent = data.camera_tilt;
             } catch (error) {
                 console.error('Error updating status:', error);
             }
@@ -408,14 +378,13 @@
         instructions.innerHTML = `
             <strong>Keyboard Controls:</strong><br>
             <strong>Movement (WASD):</strong> W=Forward, S=Backward, A=Turn Left, D=Turn Right<br>
-            <strong>Camera (Arrow Keys):</strong> ↑=Up, ↓=Down, ←=Left, →=Right<br>
+            <strong>Camera (Arrow Keys):</strong> ←=Left, →=Right<br>
             <strong>Stop:</strong> Spacebar
         `;
         document.querySelector('.container').insertBefore(instructions, document.querySelector('.container').firstChild.nextSibling);
 
-        // Auto-update distance and status every 2 seconds
+        // Auto-update status every 2 seconds
         setInterval(() => {
-            updateDistance();
             updateStatus();
         }, 2000);
 

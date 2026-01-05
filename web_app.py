@@ -114,17 +114,7 @@ def control(action):
 
 
 
-@app.route('/sensor/distance')
-def get_distance():
-    if not car:
-        return jsonify({'distance': 0, 'success': False})
 
-    try:
-        distance = car.get_distance()
-        return jsonify({'distance': distance, 'success': True})
-    except Exception as e:
-        logger.error(f"Distance sensor error: {e}")
-        return jsonify({'distance': 0, 'success': False, 'error': str(e)})
 
 @app.route('/camera_feed')
 def camera_feed():
@@ -138,8 +128,7 @@ def status():
     return jsonify({
         'car_initialized': car is not None,
         'steering_angle': car.get_steering() if car else 0,
-        'camera_pan': car.get_camera_pan() if car else 0,
-        'camera_tilt': car.get_camera_tilt() if car else 0
+        'camera_pan': car.get_camera_pan() if car else 0
     })
 
 if __name__ == '__main__':
