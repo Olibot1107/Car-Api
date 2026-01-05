@@ -184,7 +184,7 @@ def safety_monitor_loop():
                     logger.info(f"Emergency mode cleared. Distance: {distance:.1f}cm")
                     emergency_mode = False
 
-            time.sleep(0.1)  # Check every 100ms
+            time.sleep(0.02)  # Check every 20ms for faster response
 
         except Exception as e:
             logger.error(f"Safety monitor error: {e}")
