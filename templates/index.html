@@ -166,6 +166,12 @@
                 <input type="range" id="speed-slider" min="0" max="100" value="50">
             </div>
 
+            <div class="slider-container">
+                <label>
+                    <input type="checkbox" id="hardstop-toggle"> Hard Stop (Reverse braking)
+                </label>
+            </div>
+
             <div class="direction-controls">
                 <button id="forward-left" class="btn-primary">↖</button>
                 <button id="forward" class="btn-primary">↑</button>
@@ -243,6 +249,7 @@
         async function sendCommand(action, data = {}) {
             try {
                 data.speed = parseInt(speedSlider.value);
+                data.hardstop = document.getElementById('hardstop-toggle').checked;
                 const response = await fetch(`/control/${action}`, {
                     method: 'POST',
                     headers: {

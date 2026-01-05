@@ -77,7 +77,11 @@ def control(action):
         elif action == 'backward':
             success = car.backward() and car.set_speed(speed)
         elif action == 'stop':
-            success = car.stop()
+            hardstop = data.get('hardstop', False)
+            if hardstop:
+                success = car.hard_stop()
+            else:
+                success = car.stop()
         elif action == 'turn_left':
             success = car.turn_left(angle)
         elif action == 'turn_right':
