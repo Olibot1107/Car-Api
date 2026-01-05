@@ -3,6 +3,7 @@ from flask_cors import CORS
 import logging
 import cv2
 import time
+import threading
 from lib.movement import CarControl
 
 app = Flask(__name__)
@@ -12,8 +13,12 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global car control instance
+# Global variables
 car = None
+safety_thread = None
+safety_running = False
+emergency_mode = False
+emergency_stop_distance = 15.0  # cm
 
 def init_car():
     global car
@@ -141,9 +146,96 @@ def status():
         'camera_pan': car.get_camera_pan() if car else 0
     })
 
+def start_safety_monitor():
+    """Start the safety monitoring thread"""
+    global safety_thread, safety_running
+    if safety_running:
+        logger.warning("Safety monitor already running")
+        return
 
+    safety_running = True
+    safety_thread = threading.Thread(target=safety_monitor_loop, daemon=True)
+    safety_thread.start()
+    logger.info("Safety monitoring system started")
+
+def stop_safety_monitor():
+    """Stop the safety monitoring thread"""
+    global safety_running
+    safety_running = False
+    if safety_thread:
+        safety_thread.join(timeout=1.0)
+    logger.info("Safety monitoring system stopped")
+
+def safety_monitor_loop():
+    """Main safety monitoring loop"""
+    global emergency_mode
+    logger.info("Safety monitor loop started")
+    while safety_running:
+        try:
+            if car:  # Only monitor if car is available
+                distance = car.get_distance()
+
+                if distance > 0 and distance < emergency_stop_distance:
+                    if not emergency_mode:
+                        logger.warning(f"EMERGENCY: Obstacle detected at {distance:.1f}cm (< {emergency_stop_distance}cm)")
+                        trigger_emergency_stop()
+                elif emergency_mode and distance >= emergency_stop_distance + 5:  # Add buffer
+                    logger.info(f"Emergency mode cleared. Distance: {distance:.1f}cm")
+                    emergency_mode = False
+
+            time.sleep(0.1)  # Check every 100ms
+
+        except Exception as e:
+            logger.error(f"Safety monitor error: {e}")
+            time.sleep(0.5)  # Wait longer on error
+
+def trigger_emergency_stop():
+    """Trigger emergency stop and reverse sequence"""
+    global emergency_mode
+
+    emergency_mode = True
+
+    try:
+        # Immediate stop
+        car.stop()
+        time.sleep(0.1)  # Brief pause
+
+        # Start reversing at moderate speed
+        reverse_speed = 300  # Moderate reverse speed (0-1000 range)
+        logger.warning("EMERGENCY: Reversing to clear obstacle")
+
+        # Set reverse direction
+        car.backward()
+
+        # Apply reverse power
+        car.mdev.writeReg(car.mdev.CMD_PWM1, reverse_speed)
+        car.mdev.writeReg(car.mdev.CMD_PWM2, reverse_speed)
+
+        # Keep reversing until safe distance or timeout
+        start_time = time.time()
+        timeout = 3.0  # Maximum reverse time (seconds)
+
+        while emergency_mode and safety_running and (time.time() - start_time) < timeout:
+            distance = car.get_distance()
+            if distance >= emergency_stop_distance + 5:  # Safe distance with buffer
+                break
+            time.sleep(0.1)
+
+        # Stop after reversing
+        car.stop()
+        logger.info("Emergency reverse sequence completed")
+
+    except Exception as e:
+        logger.error(f"Emergency stop sequence failed: {e}")
+        # Ensure we stop even if something fails
+        try:
+            if car:
+                car.stop()
+        except:
+            pass
 
 if __name__ == '__main__':
-    init_car()  # Try to initialize car, but don't fail if it doesn't work
+    if init_car():
+        start_safety_monitor()  # Start safety monitoring if car initialized
     logger.info("Starting web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
