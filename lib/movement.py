@@ -79,7 +79,7 @@ class CarControl:
             # This creates a braking effect by opposing the car's momentum
 
             # Set motors to reverse at low speed for braking
-            brake_power = 200  # Low power for braking (0-1000 range)
+            brake_power = 400  # Low power for braking (0-1000 range)
 
             # Set direction to reverse for both motors
             if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):  # Right motor reverse
@@ -99,7 +99,7 @@ class CarControl:
 
             # Hold brake for a short time (adjust based on speed/car weight)
             import time
-            time.sleep(0.15)  # 150ms brake pulse
+            time.sleep(0.30)  # 150ms brake pulse
 
             # Then stop completely
             return self.stop()
