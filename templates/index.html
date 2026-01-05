@@ -490,8 +490,8 @@
 
         document.getElementById('update-map').addEventListener('click', updateMap);
 
-        // Auto-update map every 3 seconds
-        setInterval(updateMap, 3000);
+        // Auto-update map every 1 second (faster for continuous scanning)
+        setInterval(updateMap, 1000);
 
         // Auto-update status and distance every 2 seconds
         setInterval(() => {

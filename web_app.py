@@ -169,36 +169,55 @@ def stop_scanner():
     logger.info("Ultrasonic scanner stopped")
 
 def scanner_loop():
-    """Main scanning loop - creates a map of points around the car"""
-    logger.info("Scanner loop started")
+    """Main scanning loop - continuous high-speed scanning"""
+    logger.info("Continuous scanner started")
+    data_history = {}  # Store multiple readings for averaging
+
     while scanner_running:
         try:
             if car:  # Only scan if car is available
-                # Scan through different angles
+                # Continuous rapid scanning
                 for angle in range(scan_range[0], scan_range[1] + 1, scan_step):
                     if not scanner_running:
                         break
 
                     # Move camera/sensor to this angle
-                    # Assuming ultrasonic sensor is mounted on camera servo
                     car.set_camera_pan(90 + angle)  # Center at 90, offset by angle
-                    time.sleep(0.2)  # Wait for servo to move
+                    time.sleep(0.08)  # Faster servo movement (80ms)
 
-                    # Take distance reading at this angle
-                    distance = car.get_distance()
-                    scan_data[angle] = distance
+                    # Take multiple readings for better data quality
+                    readings = []
+                    for _ in range(2):  # Take 2 readings per angle
+                        dist = car.get_distance()
+                        if dist > 0:  # Only include valid readings
+                            readings.append(dist)
+                        time.sleep(0.02)  # Small delay between readings
 
-                    logger.debug(f"Scan point: {angle}° -> {distance:.1f}cm")
+                    # Calculate average for cleaner data
+                    if readings:
+                        avg_distance = sum(readings) / len(readings)
+                        # Simple moving average with history
+                        if angle not in data_history:
+                            data_history[angle] = []
+                        data_history[angle].append(avg_distance)
+                        # Keep only last 3 readings for smoothing
+                        if len(data_history[angle]) > 3:
+                            data_history[angle].pop(0)
+
+                        # Final smoothed value
+                        scan_data[angle] = sum(data_history[angle]) / len(data_history[angle])
+
+                        logger.debug(f"Scan {angle}°: {scan_data[angle]:.1f}cm (avg of {len(readings)} readings)")
 
                 # Return camera to center after scan
                 car.camera_center()
-                logger.debug(f"Scan complete. Points: {len(scan_data)}")
+                logger.debug(f"Continuous scan cycle complete. {len(scan_data)} active points")
 
-            time.sleep(1.0)  # Wait 1 second between full scans
+            time.sleep(0.3)  # Much faster cycle - 300ms between full scans
 
         except Exception as e:
             logger.error(f"Scanner error: {e}")
-            time.sleep(0.5)
+            time.sleep(0.2)
 
 @app.route('/scan_data')
 def get_scan_data():
