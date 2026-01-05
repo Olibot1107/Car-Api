@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from flask_cors import CORS
 import logging
+import cv2
+import time
 from lib.movement import CarControl
 
 app = Flask(__name__)
@@ -24,6 +26,33 @@ def init_car():
         logger.warning("Running in simulation mode - hardware controls will be disabled")
         car = None
         return False
+
+def generate_camera_feed():
+    """Generator function for camera feed"""
+    camera = cv2.VideoCapture(0)  # Use default camera
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    if not camera.isOpened():
+        logger.error("Could not open camera")
+        return
+
+    try:
+        while True:
+            success, frame = camera.read()
+            if not success:
+                break
+
+            # Encode frame as JPEG
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+            time.sleep(0.1)  # Control frame rate
+    finally:
+        camera.release()
 
 
 
@@ -83,6 +112,8 @@ def control(action):
         logger.error(f"Control error: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+
+
 @app.route('/sensor/distance')
 def get_distance():
     if not car:
@@ -94,6 +125,11 @@ def get_distance():
     except Exception as e:
         logger.error(f"Distance sensor error: {e}")
         return jsonify({'distance': 0, 'success': False, 'error': str(e)})
+
+@app.route('/camera_feed')
+def camera_feed():
+    return Response(generate_camera_feed(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 

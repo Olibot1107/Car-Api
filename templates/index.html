@@ -149,11 +149,11 @@
     <div class="container">
         <h1>🚗 Car Control Web App</h1>
 
-        <!-- Camera Feed (Coming Soon) -->
+        <!-- Camera Feed -->
         <div class="control-section">
             <h2>📹 Camera Feed</h2>
-            <div class="camera-container" style="text-align: center; padding: 40px; background-color: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 5px;">
-                <p style="margin: 0; color: #6c757d; font-size: 18px;">📷 Camera streaming coming soon...</p>
+            <div class="camera-container">
+                <img src="/camera_feed" class="camera-feed" alt="Camera Feed">
             </div>
         </div>
 
@@ -263,16 +263,81 @@
                 const result = await response.json();
                 if (!result.success) {
                     console.error('Command failed:', result.error);
-                    alert('Command failed: ' + (result.error || 'Unknown error'));
+                    // Don't show alerts for keyboard commands to avoid spam
                 }
                 return result;
             } catch (error) {
                 console.error('Network error:', error);
-                alert('Network error: ' + error.message);
             }
         }
 
-        // Movement controls
+        // Keyboard control state
+        const keysPressed = new Set();
+
+        // Keyboard event handlers
+        document.addEventListener('keydown', function(event) {
+            const key = event.key.toLowerCase();
+            if (!keysPressed.has(key)) {
+                keysPressed.add(key);
+                handleKeyPress(key);
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            const key = event.key.toLowerCase();
+            keysPressed.delete(key);
+            handleKeyRelease(key);
+        });
+
+        function handleKeyPress(key) {
+            switch(key) {
+                // WASD for movement
+                case 'w':
+                    sendCommand('forward');
+                    break;
+                case 's':
+                    sendCommand('backward');
+                    break;
+                case 'a':
+                    sendCommand('turn_left', {angle: 30});
+                    break;
+                case 'd':
+                    sendCommand('turn_right', {angle: 30});
+                    break;
+                // Arrow keys for camera
+                case 'arrowup':
+                    sendCommand('camera_up', {angle: 10});
+                    break;
+                case 'arrowdown':
+                    sendCommand('camera_down', {angle: 10});
+                    break;
+                case 'arrowleft':
+                    sendCommand('camera_left', {angle: 10});
+                    break;
+                case 'arrowright':
+                    sendCommand('camera_right', {angle: 10});
+                    break;
+                // Space for stop
+                case ' ':
+                    sendCommand('stop');
+                    event.preventDefault(); // Prevent page scroll
+                    break;
+            }
+        }
+
+        function handleKeyRelease(key) {
+            // Stop movement when keys are released
+            if (['w', 's', 'a', 'd'].includes(key)) {
+                // Only stop if no movement keys are pressed
+                const movementKeys = ['w', 's', 'a', 'd'];
+                const hasMovementKey = movementKeys.some(k => keysPressed.has(k));
+                if (!hasMovementKey) {
+                    sendCommand('stop');
+                }
+            }
+        }
+
+        // Button controls (still available for touch devices)
         document.getElementById('forward').addEventListener('click', () => sendCommand('forward'));
         document.getElementById('backward').addEventListener('click', () => sendCommand('backward'));
         document.getElementById('stop').addEventListener('click', () => sendCommand('stop'));
@@ -329,6 +394,24 @@
         }
 
         document.getElementById('update-status').addEventListener('click', updateStatus);
+
+        // Add instructions for keyboard controls
+        const instructions = document.createElement('div');
+        instructions.style.cssText = `
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+        `;
+        instructions.innerHTML = `
+            <strong>Keyboard Controls:</strong><br>
+            <strong>Movement (WASD):</strong> W=Forward, S=Backward, A=Turn Left, D=Turn Right<br>
+            <strong>Camera (Arrow Keys):</strong> ↑=Up, ↓=Down, ←=Left, →=Right<br>
+            <strong>Stop:</strong> Spacebar
+        `;
+        document.querySelector('.container').insertBefore(instructions, document.querySelector('.container').firstChild.nextSibling);
 
         // Auto-update distance and status every 2 seconds
         setInterval(() => {
