@@ -51,7 +51,7 @@ class CarController:
         """Main control loop that runs in a separate thread"""
         while self.running:
             try:
-                # Handle movement
+                # Handle movement - allow simultaneous forward/backward + steering
                 if self.moving_forward:
                     self.car.forward()
                     self.car.set_speed(self.current_speed)
@@ -61,24 +61,30 @@ class CarController:
                 else:
                     self.car.stop()
 
-                # Handle steering (continuous while key held)
+                # Handle steering (faster turning - 5 degrees per step)
                 if self.steering_left:
-                    # Gradually turn left
+                    # Turn left faster
                     current_angle = self.car.get_steering()
-                    new_angle = max(0, current_angle - 2)
+                    new_angle = max(0, current_angle - 5)
                     self.car.set_steering(new_angle)
                 elif self.steering_right:
-                    # Gradually turn right
+                    # Turn right faster
                     current_angle = self.car.get_steering()
-                    new_angle = min(180, current_angle + 2)
+                    new_angle = min(180, current_angle + 5)
                     self.car.set_steering(new_angle)
                 else:
-                    # Gradually return to center
+                    # Return to center faster when no steering input
                     current_angle = self.car.get_steering()
-                    if current_angle < 88:
-                        self.car.set_steering(min(90, current_angle + 2))
-                    elif current_angle > 92:
-                        self.car.set_steering(max(90, current_angle - 2))
+                    if current_angle < 85:
+                        self.car.set_steering(min(90, current_angle + 3))
+                    elif current_angle > 95:
+                        self.car.set_steering(max(90, current_angle - 3))
+
+                # Display status info
+                if self.moving_forward or self.moving_backward or self.steering_left or self.steering_right:
+                    direction = "Forward" if self.moving_forward else "Backward" if self.moving_backward else "Stopped"
+                    steering = f"Left({self.car.get_steering()}°)" if self.steering_left else f"Right({self.car.get_steering()}°)" if self.steering_right else f"Center({self.car.get_steering()}°)"
+                    print(f"\rSpeed: {self.current_speed}% | Direction: {direction} | Steering: {steering} | Camera: Pan({self.car.get_camera_pan()}°) Tilt({self.car.get_camera_tilt()}°)", end="", flush=True)
 
                 time.sleep(0.1)  # Control loop delay
 
@@ -91,19 +97,19 @@ class CarController:
         try:
             if key == keyboard.KeyCode.from_char('w'):
                 self.moving_forward = True
-                self.moving_backward = False
+                # Allow simultaneous forward + steering
                 logger.info("Moving forward")
             elif key == keyboard.KeyCode.from_char('s'):
                 self.moving_backward = True
-                self.moving_forward = False
+                # Allow simultaneous backward + steering
                 logger.info("Moving backward")
             elif key == keyboard.KeyCode.from_char('a'):
                 self.steering_left = True
-                self.steering_right = False
+                # Allow simultaneous steering + movement
                 logger.info("Steering left")
             elif key == keyboard.KeyCode.from_char('d'):
                 self.steering_right = True
-                self.steering_left = False
+                # Allow simultaneous steering + movement
                 logger.info("Steering right")
             elif key == keyboard.KeyCode.from_char('q'):
                 logger.info("Quitting...")
@@ -158,6 +164,7 @@ class CarController:
             self.car.stop()
             self.car.center_steering()
             self.car.camera_center()
+            print()  # New line after status display
             logger.info("Car control stopped and cleaned up")
 
 def main():
