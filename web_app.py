@@ -21,6 +21,8 @@ scan_data = {}  # Store scan points: {angle: distance}
 current_scan_angle = 0
 scan_step = 15  # degrees between scan points (more points!)
 scan_range = (-90, 90)  # scan from -90 to +90 degrees
+last_movement_time = 0  # Track when car last moved
+movement_detected = False
 
 def init_car():
     global car
@@ -81,14 +83,18 @@ def control(action):
 
         if action == 'forward':
             success = car.forward() and car.set_speed(speed)
+            movement_detected = True
         elif action == 'backward':
             success = car.backward() and car.set_speed(speed)
+            movement_detected = True
         elif action == 'stop':
             success = car.stop()
         elif action == 'turn_left':
             success = car.turn_left(angle)
+            movement_detected = True
         elif action == 'turn_right':
             success = car.turn_right(angle)
+            movement_detected = True
         elif action == 'center_steering':
             success = car.center_steering()
         elif action == 'camera_left':
@@ -169,51 +175,98 @@ def stop_scanner():
     logger.info("Ultrasonic scanner stopped")
 
 def scanner_loop():
-    """Main scanning loop - continuous high-speed scanning"""
-    logger.info("Continuous scanner started")
+    """Main scanning loop - movement-aware high-speed scanning"""
+    logger.info("Movement-aware scanner started")
     data_history = {}  # Store multiple readings for averaging
+    last_steering_angle = 0
+    movement_scan_count = 0
 
     while scanner_running:
         try:
             if car:  # Only scan if car is available
-                # Continuous rapid scanning
-                for angle in range(scan_range[0], scan_range[1] + 1, scan_step):
-                    if not scanner_running:
-                        break
+                current_steering = car.get_steering()
+                steering_changed = abs(current_steering - last_steering_angle) > 5  # 5° threshold
 
-                    # Move camera/sensor to this angle
-                    car.set_camera_pan(90 + angle)  # Center at 90, offset by angle
-                    time.sleep(0.08)  # Faster servo movement (80ms)
+                # Detect movement/turning
+                is_moving = steering_changed or movement_detected
+                last_steering_angle = current_steering
 
-                    # Take multiple readings for better data quality
-                    readings = []
-                    for _ in range(2):  # Take 2 readings per angle
+                if is_moving:
+                    # Movement detected - ULTRA-HIGH RESOLUTION scanning for 900+ points
+                    logger.debug("Movement detected - ULTRA-HIGH RESOLUTION scanning mode")
+                    movement_scan_count += 1
+
+                    # Ultra-fine scanning for massive data collection
+                    ultra_step = 0.25  # 0.25° steps = 4 points per degree
+                    ultra_range = (-135, 135)  # Even wider range: 270° total
+
+                    for angle in range(int(ultra_range[0] * 4), int(ultra_range[1] * 4) + 1):
+                        real_angle = angle / 4.0  # Convert back to degrees
+                        if not scanner_running:
+                            break
+
+                        # Move camera/sensor to this precise angle
+                        car.set_camera_pan(90 + real_angle)
+                        time.sleep(0.01)  # Ultra-fast servo movement (10ms)
+
+                        # Take single high-speed reading for maximum data rate
                         dist = car.get_distance()
-                        if dist > 0:  # Only include valid readings
-                            readings.append(dist)
-                        time.sleep(0.02)  # Small delay between readings
+                        if dist > 0:
+                            # Direct data storage for maximum speed (no averaging during ultra-scan)
+                            scan_data[real_angle] = dist
 
-                    # Calculate average for cleaner data
-                    if readings:
-                        avg_distance = sum(readings) / len(readings)
-                        # Simple moving average with history
-                        if angle not in data_history:
-                            data_history[angle] = []
-                        data_history[angle].append(avg_distance)
-                        # Keep only last 3 readings for smoothing
-                        if len(data_history[angle]) > 3:
-                            data_history[angle].pop(0)
+                            # Only debug log every 10th point to avoid spam
+                            if int(real_angle * 4) % 40 == 0:  # Every 10°
+                                logger.debug(f"Ultra-scan {real_angle:.1f}°: {dist:.1f}cm")
 
-                        # Final smoothed value
-                        scan_data[angle] = sum(data_history[angle]) / len(data_history[angle])
+                    logger.info(f"Ultra-scan complete: {len(scan_data)} data points collected")
 
-                        logger.debug(f"Scan {angle}°: {scan_data[angle]:.1f}cm (avg of {len(readings)} readings)")
+                    time.sleep(0.1)  # Very fast cycle during movement (100ms)
 
-                # Return camera to center after scan
-                car.camera_center()
-                logger.debug(f"Continuous scan cycle complete. {len(scan_data)} active points")
+                else:
+                    # Normal scanning when stationary
+                    # Scan with normal parameters
+                    for angle in range(scan_range[0], scan_range[1] + 1, scan_step):
+                        if not scanner_running:
+                            break
 
-            time.sleep(0.3)  # Much faster cycle - 300ms between full scans
+                        # Move camera/sensor to this angle
+                        car.set_camera_pan(90 + angle)
+                        time.sleep(0.08)  # Normal servo movement (80ms)
+
+                        # Take multiple readings for better data quality
+                        readings = []
+                        for _ in range(2):  # Take 2 readings per angle
+                            dist = car.get_distance()
+                            if dist > 0:
+                                readings.append(dist)
+                            time.sleep(0.02)
+
+                        # Calculate average for cleaner data
+                        if readings:
+                            avg_distance = sum(readings) / len(readings)
+                            # Simple moving average with history
+                            if angle not in data_history:
+                                data_history[angle] = []
+                            data_history[angle].append(avg_distance)
+                            # Keep only last 3 readings for smoothing
+                            if len(data_history[angle]) > 3:
+                                data_history[angle].pop(0)
+
+                            # Final smoothed value
+                            scan_data[angle] = sum(data_history[angle]) / len(data_history[angle])
+
+                            logger.debug(f"Stationary scan {angle}°: {scan_data[angle]:.1f}cm (avg of {len(readings)} readings)")
+
+                    # Return camera to center after scan
+                    car.camera_center()
+                    logger.debug(f"Stationary scan cycle complete. {len(scan_data)} active points")
+
+                    time.sleep(0.5)  # Slower cycle when stationary (500ms)
+
+                # Reset movement detection
+                global movement_detected
+                movement_detected = False
 
         except Exception as e:
             logger.error(f"Scanner error: {e}")
