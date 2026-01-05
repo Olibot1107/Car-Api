@@ -174,6 +174,7 @@ def safety_monitor_loop():
         try:
             if car:  # Only monitor if car is available
                 distance = car.get_distance()
+                logger.debug(f"Distance check: {distance:.1f}cm")
 
                 if distance > 0 and distance < emergency_stop_distance:
                     if not emergency_mode:
