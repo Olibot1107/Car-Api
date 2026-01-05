@@ -52,6 +52,20 @@ class AutonomousMapper:
         self.map_stability_counter = 0  # Count stable map periods
         self.completion_threshold = 10  # Stop after this many stable periods
 
+        # Progress detection and backup behavior
+        self.last_position = (0, 0)  # Track last position for progress detection
+        self.no_progress_counter = 0  # Count cycles with no progress
+        self.max_no_progress = 3  # Max cycles before backup behavior
+        self.backup_attempts = 0  # Track backup attempts
+        self.max_backup_attempts = 3  # Max backup attempts before giving up
+
+        # Localization using map data
+        self.use_map_localization = True  # Enable map-based localization
+        self.localization_confidence = 0.0  # Confidence in current position
+        self.last_scan_data = {}  # Store last scan for localization
+        self.localization_search_radius = 50  # Grid units to search for position
+        self.localization_enabled = True  # Enable localization corrections
+
         logger.info("Autonomous Mapper initialized")
 
     def start_mapping(self):
@@ -180,7 +194,110 @@ class AutonomousMapper:
             else:
                 self.map_data[grid_x][grid_y] = min(self.map_data[grid_x][grid_y], distance)
 
+        # Perform localization using the map data
+        if self.localization_enabled and len(self.map_data) > 10:  # Need some map data first
+            self._perform_localization(scan_data)
+
         logger.debug(f"Map updated: {len(self.map_data)} grid cells mapped")
+
+    def _perform_localization(self, current_scan):
+        """Use scan matching to determine actual position on the map"""
+        if not self.use_map_localization or len(self.map_data) < 5:
+            return
+
+        best_match_score = 0
+        best_position = self.current_position
+        best_heading = self.current_heading
+
+        # Search around current estimated position
+        search_radius = self.localization_search_radius
+        angle_search_range = 30  # degrees to search for heading correction
+
+        current_x, current_y = self.current_position
+
+        # Search through possible positions and headings
+        for dx in range(-search_radius, search_radius + 1, 10):  # 10 unit steps
+            for dy in range(-search_radius, search_radius + 1, 10):
+                test_x = current_x + dx
+                test_y = current_y + dy
+
+                # Test different headings
+                for heading_offset in range(-angle_search_range, angle_search_range + 1, 10):
+                    test_heading = (self.current_heading + heading_offset) % 360
+
+                    # Calculate match score for this position/heading
+                    match_score = self._calculate_scan_match(current_scan, test_x, test_y, test_heading)
+
+                    if match_score > best_match_score:
+                        best_match_score = match_score
+                        best_position = (test_x, test_y)
+                        best_heading = test_heading
+
+        # Update position if we found a good match
+        confidence_threshold = 0.6  # Minimum confidence to accept localization
+        if best_match_score > confidence_threshold:
+            old_position = self.current_position
+            position_change = math.sqrt(
+                (best_position[0] - old_position[0])**2 +
+                (best_position[1] - old_position[1])**2
+            )
+
+            # Only update if the correction is significant or confidence is high
+            if position_change > 2 or best_match_score > 0.8:
+                self.current_position = best_position
+                self.current_heading = best_heading
+                self.localization_confidence = best_match_score
+
+                logger.info(f"Localization correction: Position {old_position} -> {best_position}, "
+                          f"Heading {self.current_heading:.1f}°, Confidence: {best_match_score:.2f}")
+        else:
+            self.localization_confidence = best_match_score
+
+    def _calculate_scan_match(self, scan_data, test_x, test_y, test_heading):
+        """Calculate how well the current scan matches the map at the test position"""
+        match_score = 0
+        total_points = 0
+
+        for angle, distance in scan_data.items():
+            if distance <= 0 or distance > 300:  # Skip invalid readings
+                continue
+
+            total_points += 1
+
+            # Convert scan point to world coordinates
+            absolute_angle = math.radians(test_heading + angle)
+            obstacle_world_x = test_x + (distance * math.cos(absolute_angle) / self.map_resolution)
+            obstacle_world_y = test_y + (distance * math.sin(absolute_angle) / self.map_resolution)
+
+            # Convert to grid coordinates
+            grid_x = round(obstacle_world_x)
+            grid_y = round(obstacle_world_y)
+
+            # Check if there's an obstacle in the map at this location
+            if grid_x in self.map_data and grid_y in self.map_data[grid_x]:
+                map_distance = self.map_data[grid_x][grid_y]
+                # Calculate how well this matches (closer distances = better match)
+                distance_diff = abs(distance - map_distance)
+                if distance_diff < 20:  # Within 20cm tolerance
+                    match_score += (20 - distance_diff) / 20  # Score from 0-1
+            # Also give partial credit for nearby obstacles
+            else:
+                # Check neighboring cells
+                found_neighbor = False
+                for nx in range(grid_x - 1, grid_x + 2):
+                    for ny in range(grid_y - 1, grid_y + 2):
+                        if (nx != grid_x or ny != grid_y) and nx in self.map_data and ny in self.map_data[nx]:
+                            neighbor_distance = self.map_data[nx][ny]
+                            distance_diff = abs(distance - neighbor_distance)
+                            if distance_diff < 30:  # Looser tolerance for neighbors
+                                match_score += (30 - distance_diff) / 60  # Smaller score for neighbors
+                                found_neighbor = True
+                                break
+                    if found_neighbor:
+                        break
+
+        # Return average match score
+        return match_score / max(total_points, 1)
 
     def _plan_next_move(self, scan_data):
         """Plan the next movement based on scan data"""
@@ -188,6 +305,16 @@ class AutonomousMapper:
         if self._check_completion():
             logger.info("Mapping completion detected - exploration finished!")
             return {'action': 'complete'}
+
+        # Check for progress issues - implement backup behavior
+        if self.no_progress_counter >= self.max_no_progress:
+            if self.backup_attempts < self.max_backup_attempts:
+                self.backup_attempts += 1
+                logger.warning(f"No progress detected! Implementing backup behavior (attempt {self.backup_attempts}/{self.max_backup_attempts})")
+                return {'action': 'backup', 'distance': 25}  # Backup 25cm
+            else:
+                logger.error("Too many backup attempts - stopping mapping")
+                return {'action': 'complete'}
 
         # Find the clearest direction to move
         best_angle = 0
@@ -293,6 +420,43 @@ class AutonomousMapper:
                 self.current_position[0] + delta_x,
                 self.current_position[1] + delta_y
             )
+
+            # Check if we actually moved (progress detection)
+            distance_moved = math.sqrt(delta_x**2 + delta_y**2)
+            if distance_moved < 5:  # Less than 5cm movement = no progress
+                self.no_progress_counter += 1
+                logger.warning(f"No progress detected (moved {distance_moved:.1f}cm)")
+            else:
+                self.no_progress_counter = 0  # Reset counter on successful movement
+
+        elif action['action'] == 'backup':
+            # Backup behavior - go backwards to try different approach
+            backup_distance = action['distance']
+            logger.warning(f"Executing backup maneuver: moving backwards {backup_distance}cm")
+
+            # Move backwards
+            self.car.backward()
+            self.car.set_speed(self.speed)
+
+            # Calculate backup time
+            backup_time = (backup_distance / 50.0) * 2.0
+            time.sleep(backup_time)
+
+            self.car.stop()
+
+            # Update position (backwards movement)
+            backup_angle_rad = math.radians((self.current_heading + 180) % 360)  # Opposite direction
+            delta_x = (backup_distance * math.cos(backup_angle_rad) / self.map_resolution)
+            delta_y = (backup_distance * math.sin(backup_angle_rad) / self.map_resolution)
+
+            self.current_position = (
+                self.current_position[0] + delta_x,
+                self.current_position[1] + delta_y
+            )
+
+            # Reset progress counter after backup
+            self.no_progress_counter = 0
+            logger.info("Backup maneuver completed - trying different approach")
 
         logger.debug(f"Position: {self.current_position}, Heading: {self.current_heading}°")
 
@@ -562,8 +726,10 @@ def mapper_home():
                         const intensity = Math.max(0, 255 - (distance * 2));
                         ctx.fillStyle = `rgb(${255 - intensity}, ${intensity}, 0)`;
 
-                        // Draw obstacle point
-                        ctx.fillRect(pixelX - 2, pixelY - 2, 4, 4);
+                        // Draw obstacle point (Roomba-style individual points)
+                        ctx.beginPath();
+                        ctx.arc(pixelX, pixelY, 2, 0, 2 * Math.PI);
+                        ctx.fill();
                     }
                 }
 
