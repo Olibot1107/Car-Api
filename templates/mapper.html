@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House Mapping with LiDAR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .control-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .control-section h2 {
+            margin-top: 0;
+            color: #555;
+        }
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .map-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .map-canvas {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+        }
+        .status-display {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>House Mapping with LiDAR</h1>
+
+        <!-- Controls -->
+        <div class="control-section">
+            <h2>Controls</h2>
+            <div class="control-grid">
+                <button id="start-mapping" class="btn-success">Start Mapping</button>
+                <button id="stop-mapping" class="btn-danger">Stop Mapping</button>
+                <button id="reset-map" class="btn-warning">Reset Map</button>
+            </div>
+        </div>
+
+        <!-- Map Display -->
+        <div class="control-section">
+            <h2>Map</h2>
+            <div class="map-container">
+                <canvas id="map-canvas" class="map-canvas" width="800" height="800"></canvas>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="control-section">
+            <h2>Status</h2>
+            <div class="status-display">
+                <div>Mapping Status: <span id="mapping-status">Stopped</span></div>
+                <div>Robot Position: (<span id="robot-x">50</span>, <span id="robot-y">50</span>)</div>
+                <div>Robot Orientation: <span id="robot-theta">0.00</span> rad</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d');
+        const CANVAS_SIZE = 800;
+        const GRID_SIZE = 100;
+
+        let mapData = null;
+        let robotX = 50;
+        let robotY = 50;
+        let robotTheta = 0;
+
+        // Control functions
+        async function sendCommand(endpoint, method = 'POST') {
+            try {
+                const response = await fetch(endpoint, { method: method });
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Command failed:', error);
+            }
+        }
+
+        // Button controls
+        document.getElementById('start-mapping').addEventListener('click', async () => {
+            const result = await sendCommand('/start_mapping');
+            if (result && result.success) {
+                document.getElementById('mapping-status').textContent = 'Running';
+            }
+        });
+
+        document.getElementById('stop-mapping').addEventListener('click', async () => {
+            const result = await sendCommand('/stop_mapping');
+            if (result && result.success) {
+                document.getElementById('mapping-status').textContent = 'Stopped';
+            }
+        });
+
+        document.getElementById('reset-map').addEventListener('click', async () => {
+            const result = await sendCommand('/reset_map');
+            if (result && result.success) {
+                clearCanvas();
+            }
+        });
+
+        function clearCanvas() {
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        }
+
+        function drawMap() {
+            if (!mapData) return;
+
+            const cellSize = CANVAS_SIZE / GRID_SIZE;
+
+            for (let x = 0; x < GRID_SIZE; x++) {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    const value = mapData.grid[y][x]; // Note: grid[y][x] for correct orientation
+
+                    if (value === 1.0) {
+                        // Occupied (wall)
+                        ctx.fillStyle = '#000000';
+                    } else if (value === 0.0) {
+                        // Free space
+                        ctx.fillStyle = '#ffffff';
+                    } else {
+                        // Unknown
+                        ctx.fillStyle = '#cccccc';
+                    }
+
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+
+            // Draw robot
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(robotX * cellSize, robotY * cellSize, 5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw robot orientation
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(robotX * cellSize, robotY * cellSize);
+            ctx.lineTo(
+                robotX * cellSize + 10 * Math.cos(robotTheta),
+                robotY * cellSize + 10 * Math.sin(robotTheta)
+            );
+            ctx.stroke();
+        }
+
+        async function updateMap() {
+            try {
+                const response = await fetch('/get_map');
+                const data = await response.json();
+
+                mapData = data;
+                robotX = data.robot_x;
+                robotY = data.robot_y;
+                robotTheta = data.robot_theta;
+
+                // Update status
+                document.getElementById('robot-x').textContent = robotX.toFixed(1);
+                document.getElementById('robot-y').textContent = robotY.toFixed(1);
+                document.getElementById('robot-theta').textContent = robotTheta.toFixed(2);
+
+                drawMap();
+            } catch (error) {
+                console.error('Error updating map:', error);
+            }
+        }
+
+        // Initialize canvas
+        clearCanvas();
+
+        // Update map every second
+        setInterval(updateMap, 1000);
+
+        // Initial update
+        updateMap();
+    </script>
+</body>
+</html>
