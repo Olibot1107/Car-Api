@@ -1,23 +1,13 @@
-from flask import Flask, render_template, request, jsonify, Response, session
+from flask import Flask, render_template, request, jsonify, Response
 from flask_cors import CORS
-from flask_session import Session
 import logging
+import cv2
 import time
 import threading
-import uuid
 from lib.movement import CarControl
-
-try:
-    import cv2
-    camera_available = True
-except ImportError:
-    camera_available = False
 
 app = Flask(__name__)
 CORS(app)
-
-app.config['SESSION_TYPE'] = 'filesystem'
-Session(app)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -45,9 +35,6 @@ def init_car():
 
 def generate_camera_feed():
     """Generator function for camera feed"""
-    if not camera_available:
-        logger.error("Camera not available")
-        return
     camera = cv2.VideoCapture(0)  # Use default camera
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -77,8 +64,6 @@ def generate_camera_feed():
 
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())
     return render_template('index.html')
 
 @app.route('/control/<action>', methods=['POST'])
@@ -190,6 +175,8 @@ def status():
         'led_blue': car.led_blue_state if car and hasattr(car, 'led_blue_state') else False,
         'buzzer_active': car.buzzer_state if car and hasattr(car, 'buzzer_state') else False
     })
+
+
 
 if __name__ == '__main__':
     init_car()
