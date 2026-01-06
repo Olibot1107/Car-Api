@@ -144,6 +144,11 @@ def mapping_loop():
 
     logger.info("Starting Roomba-like house mapping")
 
+    # Start moving forward
+    if car:
+        car.forward()
+        car.set_speed(60)
+
     while mapping_running:
         # Perform LiDAR scan with servo rotation
         scan_data = perform_lidar_scan()
@@ -153,30 +158,30 @@ def mapping_loop():
 
         # Check for obstacles ahead
         if check_obstacle_ahead(scan_data):
-            # Obstacle detected, turn randomly
+            # Obstacle detected, stop and turn randomly
             logger.info("Obstacle detected, turning randomly")
             if car:
                 car.stop()
+                time.sleep(0.5)
                 turn_angle = random.choice([-90, 90, 180])  # Random turn
                 car.turn_left(turn_angle) if turn_angle < 0 else car.turn_right(turn_angle)
                 time.sleep(1.0)
                 car.center_steering()
+                time.sleep(0.5)
 
             # Update orientation
             robot_theta += math.radians(random.choice([-90, 90, 180]))
 
-        else:
-            # No obstacle, move forward with more power
+            # Resume moving forward
             if car:
                 car.forward()
-                car.set_speed(60)  # Higher speed for Roomba-like movement
-                time.sleep(1.0)  # Move for 1 second
+                car.set_speed(60)
 
-            # Update position estimate
-            robot_x += 0.2 * math.cos(robot_theta)  # Assume moved 20cm
-            robot_y += 0.2 * math.sin(robot_theta)
+        # Update position estimate while moving
+        robot_x += 0.1 * math.cos(robot_theta)  # Assume moved 10cm per cycle
+        robot_y += 0.1 * math.sin(robot_theta)
 
-        time.sleep(0.5)  # Shorter cycle for more responsive mapping
+        time.sleep(0.5)  # Scan every 0.5 seconds
 
     # Stop car when mapping ends
     if car:
