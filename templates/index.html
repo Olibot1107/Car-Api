@@ -184,25 +184,6 @@
     <div class="container">
         <h1>Car Control Web App</h1>
 
-        <!-- Queue Section -->
-        <div class="control-section">
-            <h2>Drive the Car! ($10M per turn)</h2>
-            <div id="queue-info">
-                <p><strong>Current Driver:</strong> <span id="current-driver">None</span></p>
-                <p><strong>Your Position:</strong> <span id="your-position">Not in queue</span></p>
-                <p><strong>Time Left:</strong> <span id="time-left">0</span> seconds</p>
-                <p><strong>Queue:</strong></p>
-                <ul id="queue-list"></ul>
-            </div>
-            <div id="join-section">
-                <input type="text" id="user-name" placeholder="Enter your name" value="Driver">
-                <button id="join-queue" class="btn-success">Pay $10M & Join Queue</button>
-                <button id="leave-queue" class="btn-danger" style="display:none;">Leave Queue</button>
-            </div>
-            <div id="driving-status" style="display:none;">
-                <p style="color: green; font-weight: bold;">It's your turn to drive!</p>
-            </div>
-        </div>
 
         <!-- Camera Feed -->
         <div class="control-section">
@@ -522,68 +503,7 @@
         // Initial updates
         updateStatus();
 
-        // Queue functions
-        async function updateQueueStatus() {
-            try {
-                const response = await fetch('/queue_status');
-                const data = await response.json();
-                document.getElementById('current-driver').textContent = data.current_driver || 'None';
-                document.getElementById('your-position').textContent = data.your_position || 'Not in queue';
-                document.getElementById('time-left').textContent = data.time_left;
-                const queueList = document.getElementById('queue-list');
-                queueList.innerHTML = '';
-                data.queue.forEach(item => {
-                    const li = document.createElement('li');
-                    li.textContent = `${item.position}. ${item.name}`;
-                    queueList.appendChild(li);
-                });
-                const joinBtn = document.getElementById('join-queue');
-                const leaveBtn = document.getElementById('leave-queue');
-                const drivingStatus = document.getElementById('driving-status');
-                if (data.is_driving) {
-                    joinBtn.style.display = 'none';
-                    leaveBtn.style.display = 'none';
-                    drivingStatus.style.display = 'block';
-                } else if (data.your_position) {
-                    joinBtn.style.display = 'none';
-                    leaveBtn.style.display = 'inline';
-                    drivingStatus.style.display = 'none';
-                } else {
-                    joinBtn.style.display = 'inline';
-                    leaveBtn.style.display = 'none';
-                    drivingStatus.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error updating queue status:', error);
-            }
-        }
 
-        document.getElementById('join-queue').addEventListener('click', async () => {
-            const name = document.getElementById('user-name').value;
-            try {
-                await fetch('/join_queue', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name})
-                });
-                updateQueueStatus();
-            } catch (error) {
-                console.error('Error joining queue:', error);
-            }
-        });
-
-        document.getElementById('leave-queue').addEventListener('click', async () => {
-            try {
-                await fetch('/leave_queue', {method: 'POST'});
-                updateQueueStatus();
-            } catch (error) {
-                console.error('Error leaving queue:', error);
-            }
-        });
-
-        // Update queue every 5 seconds
-        setInterval(updateQueueStatus, 5000);
-        updateQueueStatus();
     </script>
 </body>
 </html>

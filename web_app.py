@@ -31,26 +31,6 @@ proximity_running = False
 # Autonomous mapping system
 mapper = None
 
-# Queue variables
-queue = []
-current_driver = None
-turn_duration = 300  # 5 minutes
-turn_timer = None
-
-def switch_turn():
-    global current_driver, turn_timer, queue
-    if queue:
-        current_driver = queue.pop(0)
-        current_driver['start_time'] = time.time()
-        logger.info(f"Switched to driver: {current_driver['name']}")
-        turn_timer = threading.Timer(turn_duration, switch_turn)
-        turn_timer.start()
-    else:
-        current_driver = None
-        logger.info("No one in queue, car stopped")
-        if car:
-            car.stop()
-
 def init_car():
     global car
     try:
@@ -105,10 +85,6 @@ def index():
 def control(action):
     if not car:
         return jsonify({'success': False, 'error': 'Car not initialized'})
-
-    user_id = session.get('user_id')
-    if current_driver is None or current_driver['user_id'] != user_id:
-        return jsonify({'success': False, 'error': 'Not your turn to drive'})
 
     try:
         data = request.get_json() or {}
@@ -213,44 +189,6 @@ def status():
         'led_green': car.led_green_state if car and hasattr(car, 'led_green_state') else False,
         'led_blue': car.led_blue_state if car and hasattr(car, 'led_blue_state') else False,
         'buzzer_active': car.buzzer_state if car and hasattr(car, 'buzzer_state') else False
-    })
-
-@app.route('/join_queue', methods=['POST'])
-def join_queue():
-    data = request.get_json()
-    name = data.get('name', 'Anonymous')
-    # Mock payment confirmation - in real app, integrate payment gateway
-    if not any(u['user_id'] == session['user_id'] for u in queue):
-        queue.append({'user_id': session['user_id'], 'name': name, 'join_time': time.time()})
-        if current_driver is None:
-            switch_turn()
-    return jsonify({'success': True})
-
-@app.route('/leave_queue', methods=['POST'])
-def leave_queue():
-    global queue, current_driver, turn_timer
-    user_id = session.get('user_id')
-    queue = [u for u in queue if u['user_id'] != user_id]
-    if current_driver and current_driver['user_id'] == user_id:
-        if turn_timer:
-            turn_timer.cancel()
-        switch_turn()
-    return jsonify({'success': True})
-
-@app.route('/queue_status')
-def queue_status():
-    user_id = session.get('user_id')
-    position = next((i for i, u in enumerate(queue) if u['user_id'] == user_id), -1)
-    is_driving = current_driver and current_driver['user_id'] == user_id
-    time_left = 0
-    if is_driving and 'start_time' in current_driver:
-        time_left = turn_duration - (time.time() - current_driver['start_time'])
-    return jsonify({
-        'queue': [{'name': u['name'], 'position': i+1} for i, u in enumerate(queue)],
-        'current_driver': current_driver['name'] if current_driver else None,
-        'your_position': position + 1 if position >= 0 else None,
-        'is_driving': is_driving,
-        'time_left': max(0, int(time_left))
     })
 
 if __name__ == '__main__':
