@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 car = None
 proximity_thread = None
 proximity_running = False
+last_ping_time = time.time()
+ping_thread = None
+ping_monitor_running = False
 
 # Autonomous mapping system
 mapper = None
@@ -176,9 +179,30 @@ def status():
         'buzzer_active': car.buzzer_state if car and hasattr(car, 'buzzer_state') else False
     })
 
+@app.route('/ping', methods=['POST'])
+def ping():
+    global last_ping_time
+    last_ping_time = time.time()
+    return jsonify({'status': 'pong'})
+
+def ping_monitor():
+    global ping_monitor_running, last_ping_time
+    while ping_monitor_running:
+        current_time = time.time()
+        if current_time - last_ping_time > 2.0:
+            logger.warning("No ping received for 2 seconds - stopping car and activating buzzer")
+            if car:
+                car.stop()
+                car.buzzer_on(2000)
+        time.sleep(1)  # Check every second
+
 
 
 if __name__ == '__main__':
     init_car()
+    # Start ping monitor thread
+    ping_monitor_running = True
+    ping_thread = threading.Thread(target=ping_monitor, daemon=True)
+    ping_thread.start()
     logger.info("Starting web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

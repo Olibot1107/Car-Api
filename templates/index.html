@@ -499,6 +499,15 @@
             updateStatus();
         }, 2000);
 
+        // Ping server every 2 seconds
+        setInterval(async () => {
+            try {
+                await fetch('/ping', { method: 'POST' });
+            } catch (error) {
+                console.error('Ping failed:', error);
+            }
+        }, 2000);
+
         // Initial updates
         updateStatus();
     </script>
