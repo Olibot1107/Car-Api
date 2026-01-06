@@ -179,33 +179,30 @@
 
             const cellSize = CANVAS_SIZE / GRID_SIZE;
 
+            // Clear canvas with transparent background
+            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
             for (let x = 0; x < GRID_SIZE; x++) {
                 for (let y = 0; y < GRID_SIZE; y++) {
                     const value = mapData.grid[y][x]; // Note: grid[y][x] for correct orientation
 
                     if (value === 1.0) {
-                        // Occupied (wall)
-                        ctx.fillStyle = '#000000';
-                    } else if (value === 0.0) {
-                        // Free space
-                        ctx.fillStyle = '#ffffff';
-                    } else {
-                        // Unknown
-                        ctx.fillStyle = '#cccccc';
+                        // Occupied (wall) - show in red
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                     }
-
-                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    // Free space and unknown are transparent
                 }
             }
 
             // Draw robot
-            ctx.fillStyle = '#ff0000';
+            ctx.fillStyle = '#00ff00';
             ctx.beginPath();
             ctx.arc(robotX * cellSize, robotY * cellSize, 5, 0, 2 * Math.PI);
             ctx.fill();
 
             // Draw robot orientation
-            ctx.strokeStyle = '#ff0000';
+            ctx.strokeStyle = '#00ff00';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(robotX * cellSize, robotY * cellSize);

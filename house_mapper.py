@@ -78,49 +78,52 @@ def grid_to_world(grid_x, grid_y):
     y = (grid_y - MAP_CENTER) * CELL_SIZE
     return x, y
 
-def simulate_lidar_scan():
-    """Simulate LiDAR scan (in real implementation, use actual LiDAR)"""
+def perform_lidar_scan():
+    """Perform LiDAR scan using ultrasonic sensor rotated by camera servo"""
     scan_data = []
-    for angle in LIDAR_ANGLES:
-        # Simulate distance measurement with some noise
-        true_distance = LIDAR_RANGE
-        # Add some walls/obstacles in simulation
-        if abs(angle) < 0.1:  # Forward
-            true_distance = 2.0
-        elif abs(angle - math.pi/2) < 0.1:  # Right
-            true_distance = 1.5
-        elif abs(angle + math.pi/2) < 0.1:  # Left
-            true_distance = 1.5
+    angles_deg = np.linspace(0, 360, 36)  # 36 scans, 10 degrees each
 
-        # Add noise
-        distance = true_distance + np.random.normal(0, 0.1)
-        distance = max(0.1, min(LIDAR_RANGE, distance))
-        scan_data.append(distance)
+    for angle_deg in angles_deg:
+        if car:
+            # Rotate camera servo to angle
+            car.set_camera_pan(angle_deg)
+            time.sleep(0.05)  # Wait for servo to move
+
+            # Get distance reading
+            distance_cm = car.get_distance()
+            distance_m = distance_cm / 100.0  # Convert to meters
+
+            # Convert to radians for map update
+            angle_rad = math.radians(angle_deg - 180)  # Adjust for coordinate system
+            scan_data.append((angle_rad, distance_m))
+
+    # Return to center
+    if car:
+        car.set_camera_pan(90)
+
     return scan_data
 
 def update_map(scan_data):
     """Update occupancy grid with LiDAR scan data"""
     global occupancy_grid, robot_x, robot_y, robot_theta
 
-    for i, distance in enumerate(scan_data):
-        angle = LIDAR_ANGLES[i] + robot_theta
-
+    for angle, distance in scan_data:
         # Calculate obstacle position
-        obs_x = robot_x + distance * math.cos(angle)
-        obs_y = robot_y + distance * math.sin(angle)
+        obs_x = robot_x + distance * math.cos(angle + robot_theta)
+        obs_y = robot_y + distance * math.sin(angle + robot_theta)
 
         # Convert to grid coordinates
         grid_x, grid_y = world_to_grid(obs_x, obs_y)
 
         if 0 <= grid_x < MAP_SIZE and 0 <= grid_y < MAP_SIZE:
-            # Mark as occupied
+            # Mark as occupied (wall)
             occupancy_grid[grid_x, grid_y] = 1.0
 
         # Mark free space along the ray
         steps = int(distance / CELL_SIZE)
         for step in range(1, steps):
-            ray_x = robot_x + step * CELL_SIZE * math.cos(angle)
-            ray_y = robot_y + step * CELL_SIZE * math.sin(angle)
+            ray_x = robot_x + step * CELL_SIZE * math.cos(angle + robot_theta)
+            ray_y = robot_y + step * CELL_SIZE * math.sin(angle + robot_theta)
             ray_grid_x, ray_grid_y = world_to_grid(ray_x, ray_y)
             if 0 <= ray_grid_x < MAP_SIZE and 0 <= ray_grid_y < MAP_SIZE:
                 occupancy_grid[ray_grid_x, ray_grid_y] = 0.0
@@ -132,18 +135,24 @@ def mapping_loop():
     logger.info("Starting house mapping")
 
     while mapping_running:
-        # Simulate LiDAR scan
-        scan_data = simulate_lidar_scan()
+        # Perform LiDAR scan with servo rotation
+        scan_data = perform_lidar_scan()
 
         # Update map
         update_map(scan_data)
 
-        # Simulate slow movement
-        robot_x += 0.05 * math.cos(robot_theta)
-        robot_y += 0.05 * math.sin(robot_theta)
-        robot_theta += 0.01  # Slight rotation
+        # Move the car slowly forward
+        if car:
+            car.forward()
+            car.set_speed(30)  # Slow speed
+            time.sleep(0.5)  # Move for 0.5 seconds
+            car.stop()
 
-        time.sleep(0.1)  # 10 Hz mapping
+        # Update position estimate (dead reckoning)
+        robot_x += 0.1 * math.cos(robot_theta)  # Assume moved 10cm forward
+        robot_theta += 0.1  # Slight turn
+
+        time.sleep(1.0)  # Scan every second
 
     logger.info("Mapping stopped")
 
