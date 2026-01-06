@@ -18,6 +18,7 @@ python3 house_mapper.py
 
 import time
 import math
+import random
 import threading
 import logging
 from flask import Flask, render_template, request, jsonify, Response
@@ -128,11 +129,20 @@ def update_map(scan_data):
             if 0 <= ray_grid_x < MAP_SIZE and 0 <= ray_grid_y < MAP_SIZE:
                 occupancy_grid[ray_grid_x, ray_grid_y] = 0.0
 
+def check_obstacle_ahead(scan_data, threshold=0.5):
+    """Check if there's an obstacle ahead"""
+    for angle, distance in scan_data:
+        # Check forward direction (±30 degrees)
+        if abs(angle) < math.radians(30):
+            if distance < threshold:
+                return True
+    return False
+
 def mapping_loop():
-    """Main mapping loop"""
+    """Main mapping loop with Roomba-like behavior"""
     global mapping_running, robot_x, robot_y, robot_theta
 
-    logger.info("Starting house mapping")
+    logger.info("Starting Roomba-like house mapping")
 
     while mapping_running:
         # Perform LiDAR scan with servo rotation
@@ -141,19 +151,36 @@ def mapping_loop():
         # Update map
         update_map(scan_data)
 
-        # Move the car slowly forward
-        if car:
-            car.forward()
-            car.set_speed(30)  # Slow speed
-            time.sleep(0.5)  # Move for 0.5 seconds
-            car.stop()
+        # Check for obstacles ahead
+        if check_obstacle_ahead(scan_data):
+            # Obstacle detected, turn randomly
+            logger.info("Obstacle detected, turning randomly")
+            if car:
+                car.stop()
+                turn_angle = random.choice([-90, 90, 180])  # Random turn
+                car.turn_left(turn_angle) if turn_angle < 0 else car.turn_right(turn_angle)
+                time.sleep(1.0)
+                car.center_steering()
 
-        # Update position estimate (dead reckoning)
-        robot_x += 0.1 * math.cos(robot_theta)  # Assume moved 10cm forward
-        robot_theta += 0.1  # Slight turn
+            # Update orientation
+            robot_theta += math.radians(random.choice([-90, 90, 180]))
 
-        time.sleep(1.0)  # Scan every second
+        else:
+            # No obstacle, move forward with more power
+            if car:
+                car.forward()
+                car.set_speed(60)  # Higher speed for Roomba-like movement
+                time.sleep(1.0)  # Move for 1 second
 
+            # Update position estimate
+            robot_x += 0.2 * math.cos(robot_theta)  # Assume moved 20cm
+            robot_y += 0.2 * math.sin(robot_theta)
+
+        time.sleep(0.5)  # Shorter cycle for more responsive mapping
+
+    # Stop car when mapping ends
+    if car:
+        car.stop()
     logger.info("Mapping stopped")
 
 @app.route('/')
