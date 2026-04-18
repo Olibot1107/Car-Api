@@ -93,6 +93,23 @@
             max-width: 100%;
             border: 1px solid #ddd;
             border-radius: 5px;
+            background: #111;
+        }
+        .camera-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        .camera-meta select {
+            padding: 8px 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background: white;
         }
         .status-display {
             background-color: #f8f9fa;
@@ -188,8 +205,14 @@
         <div class="control-section">
             <h2>Camera Feed</h2>
             <div class="camera-container">
-                <img src="/camera_feed" class="camera-feed" alt="Camera Feed">
-                <div style="text-align: center; margin-top: 10px;">
+                <img id="camera-feed" src="/camera_feed?width=320&height=240&quality=55&fps=12" class="camera-feed" alt="Camera Feed" loading="eager" decoding="async">
+                <div class="camera-meta">
+                    <label for="camera-stream-quality">Stream quality:</label>
+                    <select id="camera-stream-quality">
+                        <option value="low" selected>Low bandwidth</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="high">High quality</option>
+                    </select>
                     <button id="fullscreen-btn" class="btn-success">Full Screen</button>
                 </div>
             </div>
@@ -424,6 +447,23 @@
                 img.msRequestFullscreen();
             }
         });
+
+        const cameraFeed = document.getElementById('camera-feed');
+        const cameraStreamQuality = document.getElementById('camera-stream-quality');
+
+        const cameraProfiles = {
+            low: { width: 320, height: 240, quality: 45, fps: 8 },
+            balanced: { width: 480, height: 360, quality: 60, fps: 12 },
+            high: { width: 640, height: 480, quality: 80, fps: 20 }
+        };
+
+        function updateCameraStream() {
+            const profile = cameraProfiles[cameraStreamQuality.value] || cameraProfiles.low;
+            const params = new URLSearchParams(profile);
+            cameraFeed.src = `/camera_feed?${params.toString()}`;
+        }
+
+        cameraStreamQuality.addEventListener('change', updateCameraStream);
 
         // Buzzer controls
         document.getElementById('buzzer-on').addEventListener('click', () => sendCommand('buzzer_on', {frequency: 2000}));

@@ -21,6 +21,82 @@ proximity_running = False
 # Autonomous mapping system
 mapper = None
 
+
+class CameraStream:
+    """Background camera reader that always keeps the latest frame.
+
+    This avoids building a backlog of old frames when the browser connection
+    is slow or unstable. The stream endpoint can then encode the newest frame
+    on demand with a bandwidth-friendly size and quality.
+    """
+
+    def __init__(self, index=0):
+        self.index = index
+        self.camera = None
+        self.lock = threading.Lock()
+        self.latest_frame = None
+        self.latest_frame_id = 0
+        self.running = False
+        self.thread = None
+
+    def start(self):
+        if self.running:
+            return
+
+        self.camera = cv2.VideoCapture(self.index)
+        if not self.camera.isOpened():
+            raise RuntimeError("Could not open camera")
+
+        # Keep the source capture modest; the stream endpoint can downscale further.
+        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # Keep the capture buffer small so slow clients do not see a backlog.
+        self.camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.running = True
+        self.thread = threading.Thread(target=self._reader_loop, daemon=True)
+        self.thread.start()
+
+    def _reader_loop(self):
+        try:
+            while self.running:
+                success, frame = self.camera.read()
+                if not success:
+                    time.sleep(0.05)
+                    continue
+
+                with self.lock:
+                    self.latest_frame = frame
+                    self.latest_frame_id += 1
+        finally:
+            if self.camera is not None:
+                self.camera.release()
+                self.camera = None
+
+    def get_latest_frame(self):
+        with self.lock:
+            if self.latest_frame is None:
+                return None, self.latest_frame_id
+            return self.latest_frame.copy(), self.latest_frame_id
+
+    def stop(self):
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1.0)
+
+
+camera_stream = None
+
+
+def init_camera_stream():
+    global camera_stream
+    if camera_stream is not None:
+        return camera_stream
+
+    camera_stream = CameraStream(0)
+    camera_stream.start()
+    logger.info("Camera stream initialized successfully")
+    return camera_stream
+
 def init_car():
     global car
     try:
@@ -33,32 +109,38 @@ def init_car():
         car = None
         return False
 
-def generate_camera_feed():
-    """Generator function for camera feed"""
-    camera = cv2.VideoCapture(0)  # Use default camera
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+def generate_camera_feed(target_width=320, target_height=240, quality=55, fps=12):
+    """Generator function for camera feed."""
+    stream = init_camera_stream()
+    interval = 1.0 / max(1, fps)
+    last_frame_id = -1
 
-    if not camera.isOpened():
-        logger.error("Could not open camera")
-        return
+    while True:
+        frame, frame_id = stream.get_latest_frame()
+        if frame is None:
+            time.sleep(0.05)
+            continue
 
-    try:
-        while True:
-            success, frame = camera.read()
-            if not success:
-                break
+        # Skip duplicate frames when the camera thread has not produced a new one.
+        if frame_id == last_frame_id:
+            time.sleep(interval)
+            continue
 
-            # Encode frame as JPEG
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
+        last_frame_id = frame_id
 
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        # Resize before JPEG encoding to keep the stream lighter on slow links.
+        if target_width > 0 and target_height > 0:
+            frame = cv2.resize(frame, (target_width, target_height), interpolation=cv2.INTER_AREA)
 
-            time.sleep(0.02)  # Control frame rate - faster (50 FPS)
-    finally:
-        camera.release()
+        encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), max(20, min(95, quality))]
+        ret, buffer = cv2.imencode('.jpg', frame, encode_params)
+        if not ret:
+            continue
+
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+        time.sleep(interval)
 
 
 
@@ -146,7 +228,18 @@ def emergency_stop():
 
 @app.route('/camera_feed')
 def camera_feed():
-    return Response(generate_camera_feed(),
+    width = request.args.get('width', default=320, type=int)
+    height = request.args.get('height', default=240, type=int)
+    quality = request.args.get('quality', default=55, type=int)
+    fps = request.args.get('fps', default=12, type=int)
+
+    try:
+        init_camera_stream()
+    except Exception as e:
+        logger.error(f"Could not start camera feed: {e}")
+        return jsonify({'success': False, 'error': 'Could not open camera'}), 503
+
+    return Response(generate_camera_feed(width, height, quality, fps),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/sensor/distance')
@@ -180,5 +273,9 @@ def status():
 
 if __name__ == '__main__':
     init_car()
+    try:
+        init_camera_stream()
+    except Exception as e:
+        logger.warning(f"Camera stream could not be initialized: {e}")
     logger.info("Starting web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
