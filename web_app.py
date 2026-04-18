@@ -235,6 +235,33 @@ def control(action):
         logger.error(f"Control error: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+
+@app.route('/drive', methods=['POST'])
+def drive():
+    if not car:
+        return jsonify({'success': False, 'error': 'Car not initialized'})
+
+    try:
+        data = request.get_json() or {}
+        mode = data.get('mode', 'stop')
+        speed = data.get('speed', 50)
+        angle = data.get('angle', 100)
+
+        if mode == 'stop':
+            success = car.stop()
+        elif mode == 'forward':
+            success = car.set_steering(angle) and car.forward() and car.set_speed(speed)
+        elif mode == 'backward':
+            success = car.set_steering(angle) and car.backward() and car.set_speed(speed)
+        else:
+            return jsonify({'success': False, 'error': f'Unknown drive mode: {mode}'}), 400
+
+        return jsonify({'success': success})
+
+    except Exception as e:
+        logger.error(f"Drive error: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/emergency_stop', methods=['POST'])
 def emergency_stop():
     """Emergency stop - stops car and shuts down the app"""

@@ -165,6 +165,38 @@
             border: 1px dashed rgba(255, 255, 255, 0.12);
         }
 
+        .ring-label {
+            position: absolute;
+            color: rgba(238, 244, 255, 0.92);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+        }
+
+        .ring-label span {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.20);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .ring-top { left: 50%; top: 10%; }
+        .ring-top-left { left: 24%; top: 24%; }
+        .ring-top-right { left: 76%; top: 24%; }
+        .ring-left { left: 10%; top: 50%; }
+        .ring-right { left: 90%; top: 50%; }
+        .ring-bottom-left { left: 24%; top: 76%; }
+        .ring-bottom { left: 50%; top: 90%; }
+        .ring-bottom-right { left: 76%; top: 76%; }
+        .ring-center { left: 50%; top: 50%; }
+
         .knob {
             position: absolute;
             left: 50%;
@@ -265,6 +297,15 @@
 
                 <div class="joystick-wrap">
                     <div id="joystick" class="joystick" aria-label="Joystick control" role="application">
+                        <div class="ring-label ring-top"><span>Forward</span></div>
+                        <div class="ring-label ring-top-left"><span>Fwd Turn L</span></div>
+                        <div class="ring-label ring-top-right"><span>Fwd Turn R</span></div>
+                        <div class="ring-label ring-left"><span>Left</span></div>
+                        <div class="ring-label ring-right"><span>Right</span></div>
+                        <div class="ring-label ring-bottom-left"><span>Back Turn L</span></div>
+                        <div class="ring-label ring-bottom"><span>Stop</span></div>
+                        <div class="ring-label ring-bottom-right"><span>Back Turn R</span></div>
+                        <div class="ring-label ring-center"><span>Neutral</span></div>
                         <div id="knob" class="knob"></div>
                     </div>
                 </div>
@@ -326,6 +367,14 @@
             }).catch(error => console.error('Command error:', error));
         }
 
+        function sendDrive(data = {}) {
+            return fetch('/drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).catch(error => console.error('Drive error:', error));
+        }
+
         function moveKnob(x, y) {
             const radius = state.maxRadius;
             const px = clamp(x, -1, 1) * radius;
@@ -350,7 +399,7 @@
 
         function sendDriveState(force = false) {
             const base = parseInt(baseSpeed.value, 10);
-            const deadzone = 0.12;
+            const deadzone = 0.08;
             const x = state.x;
             const y = state.y;
             const magnitude = Math.hypot(x, y);
@@ -363,33 +412,33 @@
                 state.lastSent.speed = base;
                 state.lastSent.angle = 100;
                 steerReadout.textContent = 'Center';
-                sendCommand('stop', { speed: base });
-                sendCommand('center_steering');
+                speedReadout.textContent = base;
+                sendDrive({ mode: 'stop' });
                 return;
             }
 
             const angle = clamp(Math.round(100 + x * 55), 35, 165);
-            const speed = clamp(Math.round(base + magnitude * 35), 10, 100);
+            const speed = clamp(Math.round(base + Math.max(0, -y) * 40), 10, 100);
             const direction = y < 0 ? 'forward' : 'backward';
             const steerLabel = angle < 100 ? 'Left' : angle > 100 ? 'Right' : 'Center';
 
             steerReadout.textContent = steerLabel;
             speedReadout.textContent = speed;
 
-            if (force || Math.abs(angle - state.lastSent.angle) >= 3) {
-                sendCommand('set_steering', { angle });
-                state.lastSent.angle = angle;
-            }
-
-            if (
+            const shouldSend =
                 force ||
                 state.lastSent.mode !== direction ||
-                Math.abs(speed - state.lastSent.speed) >= 4
-            ) {
-                sendCommand(direction, { speed });
-                state.lastSent.mode = direction;
-                state.lastSent.speed = speed;
+                Math.abs(speed - state.lastSent.speed) >= 2 ||
+                Math.abs(angle - state.lastSent.angle) >= 2;
+
+            if (!shouldSend) {
+                return;
             }
+
+            sendDrive({ mode: direction, speed, angle });
+            state.lastSent.mode = direction;
+            state.lastSent.speed = speed;
+            state.lastSent.angle = angle;
         }
 
         function scheduleFlush(force = false) {
@@ -399,10 +448,10 @@
             state.flushTimer = setTimeout(() => {
                 state.flushTimer = null;
                 sendDriveState(force);
-            }, force ? 0 : 70);
+            }, force ? 0 : 25);
         }
 
-        function setFromPointer(event) {
+        function setFromPointer(event, force = false) {
             const rect = joystick.getBoundingClientRect();
             const clientX = event.clientX;
             const clientY = event.clientY;
@@ -415,7 +464,13 @@
             state.x = nx;
             state.y = ny;
             moveKnob(nx, ny);
-            scheduleFlush(false);
+            speedReadout.textContent = clamp(Math.round(parseInt(baseSpeed.value, 10) + Math.max(0, -ny) * 40), 10, 100);
+            steerReadout.textContent = nx < -0.08 ? 'Left' : nx > 0.08 ? 'Right' : 'Center';
+            if (force) {
+                sendDriveState(true);
+            } else {
+                scheduleFlush(false);
+            }
         }
 
         joystick.addEventListener('pointerdown', (event) => {
@@ -423,7 +478,7 @@
             state.active = true;
             state.pointerId = event.pointerId;
             updateJoystickMetrics();
-            setFromPointer(event);
+            setFromPointer(event, true);
             event.preventDefault();
         });
 
@@ -431,7 +486,7 @@
             if (!state.active || state.pointerId !== event.pointerId) {
                 return;
             }
-            setFromPointer(event);
+            setFromPointer(event, false);
             event.preventDefault();
         });
 
@@ -471,8 +526,7 @@
         });
 
         stopBtn.addEventListener('click', () => {
-            sendCommand('stop');
-            sendCommand('center_steering');
+            sendDrive({ mode: 'stop' });
             resetKnob();
             state.lastSent.mode = 'stop';
             state.lastSent.angle = 100;
