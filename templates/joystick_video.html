@@ -234,6 +234,15 @@
             color: white;
         }
 
+        .btn-sos {
+            background: linear-gradient(160deg, #ff3838, #b80000);
+            color: white;
+            box-shadow: 0 10px 22px rgba(255, 56, 56, 0.35);
+            min-height: 64px;
+            font-size: 1.05rem;
+            letter-spacing: 0.04em;
+        }
+
         .btn-center {
             background: linear-gradient(160deg, #ffd66b, #ffb84d);
             color: #1a1a1a;
@@ -321,6 +330,7 @@
                     <button id="stop-btn" class="btn btn-stop">Stop</button>
                     <a href="/" class="btn btn-nav" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">Dashboard</a>
                     <button id="refresh-btn" class="btn btn-nav">Refresh Cam</button>
+                    <button id="sos-btn" class="btn btn-sos" style="grid-column: 1 / -1;">SOS STOP</button>
                 </div>
 
                 <div class="readout">
@@ -342,6 +352,7 @@
         const invertBtn = document.getElementById('invert-btn');
         const centerBtn = document.getElementById('center-btn');
         const stopBtn = document.getElementById('stop-btn');
+        const sosBtn = document.getElementById('sos-btn');
         const refreshBtn = document.getElementById('refresh-btn');
 
         const state = {
@@ -382,6 +393,34 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             }).catch(error => console.error('Drive error:', error));
+        }
+
+        function hardStop() {
+            if (state.active && state.pointerId !== null) {
+                try {
+                    joystick.releasePointerCapture(state.pointerId);
+                } catch (error) {
+                    // Ignore capture release errors; the stop command still goes out.
+                }
+            }
+
+            if (state.flushTimer) {
+                clearTimeout(state.flushTimer);
+                state.flushTimer = null;
+            }
+
+            state.active = false;
+            state.pointerId = null;
+            state.x = 0;
+            state.y = 0;
+            state.lastSent.mode = 'stop';
+            state.lastSent.speed = -1;
+            state.lastSent.angle = 100;
+
+            resetKnob();
+            steerReadout.textContent = 'Center';
+            speedReadout.textContent = baseSpeed.value;
+            sendDrive({ mode: 'stop' });
         }
 
         function moveKnob(x, y) {
@@ -552,11 +591,13 @@
         });
 
         stopBtn.addEventListener('click', () => {
-            sendDrive({ mode: 'stop' });
-            resetKnob();
-            state.lastSent.mode = 'stop';
-            state.lastSent.angle = 100;
-            steerReadout.textContent = 'Center';
+            hardStop();
+        });
+
+        sosBtn.addEventListener('click', () => {
+            hardStop();
+            sosBtn.classList.add('btn-active');
+            setTimeout(() => sosBtn.classList.remove('btn-active'), 180);
         });
 
         refreshBtn.addEventListener('click', () => {
