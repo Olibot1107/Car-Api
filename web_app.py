@@ -186,6 +186,11 @@ def generate_camera_feed(target_width=320, target_height=240, quality=55, fps=12
 def index():
     return render_template('index.html')
 
+
+@app.route('/joystick_video')
+def joystick_video():
+    return render_template('joystick_video.html')
+
 @app.route('/control/<action>', methods=['POST'])
 def control(action):
     if not car:
@@ -210,6 +215,8 @@ def control(action):
             success = car.turn_right(angle)
         elif action == 'center_steering':
             success = car.center_steering()
+        elif action == 'set_steering':
+            success = car.set_steering(data.get('angle', 100))
         elif action == 'buzzer_on':
             frequency = data.get('frequency', 2000)
             success = car.buzzer_on(frequency)

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Joy Stick Video</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg-a: #08111f;
+            --bg-b: #14253d;
+            --panel: rgba(255, 255, 255, 0.10);
+            --panel-border: rgba(255, 255, 255, 0.16);
+            --text: #eef4ff;
+            --muted: rgba(238, 244, 255, 0.72);
+            --accent: #6ad1ff;
+            --accent-2: #7cff9b;
+            --warn: #ff6464;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top left, rgba(106, 209, 255, 0.24), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(124, 255, 155, 0.16), transparent 24%),
+                linear-gradient(160deg, var(--bg-a), var(--bg-b));
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            overscroll-behavior: none;
+        }
+
+        body {
+            padding: 14px;
+        }
+
+        .shell {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .title {
+            margin: 0;
+            font-size: clamp(1.6rem, 4vw, 2.3rem);
+            letter-spacing: 0.02em;
+        }
+
+        .subtitle {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid var(--panel-border);
+            border-radius: 999px;
+            padding: 10px 14px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 22px;
+            padding: 14px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+        }
+
+        .video-wrap {
+            overflow: hidden;
+            border-radius: 18px;
+            background: #05070c;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .camera-feed {
+            width: 100%;
+            display: block;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            background: #05070c;
+        }
+
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 12px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 0.92rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .joystick-card {
+            display: grid;
+            gap: 14px;
+        }
+
+        .joystick-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 0 4px;
+        }
+
+        .joystick {
+            position: relative;
+            width: min(78vw, 340px);
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at center, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.05) 38%, rgba(255, 255, 255, 0.02) 65%, transparent 66%),
+                radial-gradient(circle at center, rgba(106, 209, 255, 0.22), transparent 52%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 18px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        .joystick::before {
+            content: "";
+            position: absolute;
+            inset: 18%;
+            border-radius: 50%;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+        }
+
+        .knob {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 38%;
+            height: 38%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.35)),
+                linear-gradient(160deg, rgba(124, 255, 155, 0.95), rgba(106, 209, 255, 0.85));
+            box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .controls-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .btn {
+            appearance: none;
+            border: 0;
+            border-radius: 16px;
+            padding: 16px 14px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #08111f;
+            cursor: pointer;
+            min-height: 54px;
+        }
+
+        .btn-stop {
+            background: linear-gradient(160deg, #ff7d7d, #ff5151);
+            color: white;
+        }
+
+        .btn-center {
+            background: linear-gradient(160deg, #ffd66b, #ffb84d);
+            color: #1a1a1a;
+        }
+
+        .btn-nav {
+            background: linear-gradient(160deg, #7be6ff, #5fc3ff);
+        }
+
+        .speed {
+            display: grid;
+            gap: 8px;
+        }
+
+        .speed input[type="range"] {
+            width: 100%;
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        @media (min-width: 860px) {
+            .grid {
+                grid-template-columns: 1.3fr 0.9fr;
+                align-items: start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <div class="topbar">
+            <div>
+                <h1 class="title">Joy Stick Video</h1>
+                <p class="subtitle">Camera feed plus a mobile joystick for steering and speed.</p>
+            </div>
+            <a class="back-link" href="/">Back</a>
+        </div>
+
+        <div class="grid">
+            <section class="card">
+                <div class="video-wrap">
+                    <img id="camera-feed" class="camera-feed" src="/camera_feed?width=480&height=360&quality=60&fps=12" alt="Camera feed" loading="eager" decoding="async">
+                </div>
+                <div class="meta-row">
+                    <div class="chip">Steering: <span id="steer-readout">Center</span></div>
+                    <div class="chip">Speed: <span id="speed-readout">50</span>%</div>
+                </div>
+            </section>
+
+            <section class="card joystick-card">
+                <div class="speed">
+                    <label for="base-speed">Base Speed</label>
+                    <input id="base-speed" type="range" min="0" max="100" value="50">
+                </div>
+
+                <div class="joystick-wrap">
+                    <div id="joystick" class="joystick" aria-label="Joystick control" role="application">
+                        <div id="knob" class="knob"></div>
+                    </div>
+                </div>
+
+                <div class="controls-row">
+                    <button id="center-btn" class="btn btn-center">Center</button>
+                    <button id="stop-btn" class="btn btn-stop">Stop</button>
+                    <a href="/" class="btn btn-nav" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">Dashboard</a>
+                    <button id="refresh-btn" class="btn btn-nav">Refresh Cam</button>
+                </div>
+
+                <div class="readout">
+                    <span>Drag the stick up to drive forward.</span>
+                    <span>Drag left and right to steer.</span>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const joystick = document.getElementById('joystick');
+        const knob = document.getElementById('knob');
+        const cameraFeed = document.getElementById('camera-feed');
+        const baseSpeed = document.getElementById('base-speed');
+        const speedReadout = document.getElementById('speed-readout');
+        const steerReadout = document.getElementById('steer-readout');
+        const centerBtn = document.getElementById('center-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+
+        const state = {
+            active: false,
+            pointerId: null,
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            centerX: 0,
+            centerY: 0,
+            maxRadius: 0,
+            flushTimer: null,
+            lastSent: {
+                mode: '',
+                speed: -1,
+                angle: -1
+            }
+        };
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function sendCommand(action, data = {}) {
+            data.speed = parseInt(baseSpeed.value, 10);
+            return fetch(`/control/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).catch(error => console.error('Command error:', error));
+        }
+
+        function moveKnob(x, y) {
+            const radius = state.maxRadius;
+            const px = clamp(x, -1, 1) * radius;
+            const py = clamp(y, -1, 1) * radius;
+            knob.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
+        }
+
+        function updateJoystickMetrics() {
+            const rect = joystick.getBoundingClientRect();
+            state.width = rect.width;
+            state.height = rect.height;
+            state.centerX = rect.width / 2;
+            state.centerY = rect.height / 2;
+            state.maxRadius = Math.min(rect.width, rect.height) * 0.34;
+        }
+
+        function resetKnob() {
+            state.x = 0;
+            state.y = 0;
+            moveKnob(0, 0);
+        }
+
+        function sendDriveState(force = false) {
+            const base = parseInt(baseSpeed.value, 10);
+            const deadzone = 0.12;
+            const x = state.x;
+            const y = state.y;
+            const magnitude = Math.hypot(x, y);
+
+            if (magnitude < deadzone) {
+                if (!force && state.lastSent.mode === 'stop') {
+                    return;
+                }
+                state.lastSent.mode = 'stop';
+                state.lastSent.speed = base;
+                state.lastSent.angle = 100;
+                steerReadout.textContent = 'Center';
+                sendCommand('stop', { speed: base });
+                sendCommand('center_steering');
+                return;
+            }
+
+            const angle = clamp(Math.round(100 + x * 55), 35, 165);
+            const speed = clamp(Math.round(base + magnitude * 35), 10, 100);
+            const direction = y < 0 ? 'forward' : 'backward';
+            const steerLabel = angle < 100 ? 'Left' : angle > 100 ? 'Right' : 'Center';
+
+            steerReadout.textContent = steerLabel;
+            speedReadout.textContent = speed;
+
+            if (force || Math.abs(angle - state.lastSent.angle) >= 3) {
+                sendCommand('set_steering', { angle });
+                state.lastSent.angle = angle;
+            }
+
+            if (
+                force ||
+                state.lastSent.mode !== direction ||
+                Math.abs(speed - state.lastSent.speed) >= 4
+            ) {
+                sendCommand(direction, { speed });
+                state.lastSent.mode = direction;
+                state.lastSent.speed = speed;
+            }
+        }
+
+        function scheduleFlush(force = false) {
+            if (state.flushTimer) {
+                clearTimeout(state.flushTimer);
+            }
+            state.flushTimer = setTimeout(() => {
+                state.flushTimer = null;
+                sendDriveState(force);
+            }, force ? 0 : 70);
+        }
+
+        function setFromPointer(event) {
+            const rect = joystick.getBoundingClientRect();
+            const clientX = event.clientX;
+            const clientY = event.clientY;
+            const dx = clientX - (rect.left + rect.width / 2);
+            const dy = clientY - (rect.top + rect.height / 2);
+            const radius = state.maxRadius || Math.min(rect.width, rect.height) * 0.34;
+            const nx = clamp(dx / radius, -1, 1);
+            const ny = clamp(dy / radius, -1, 1);
+
+            state.x = nx;
+            state.y = ny;
+            moveKnob(nx, ny);
+            scheduleFlush(false);
+        }
+
+        joystick.addEventListener('pointerdown', (event) => {
+            joystick.setPointerCapture(event.pointerId);
+            state.active = true;
+            state.pointerId = event.pointerId;
+            updateJoystickMetrics();
+            setFromPointer(event);
+            event.preventDefault();
+        });
+
+        joystick.addEventListener('pointermove', (event) => {
+            if (!state.active || state.pointerId !== event.pointerId) {
+                return;
+            }
+            setFromPointer(event);
+            event.preventDefault();
+        });
+
+        function releaseJoystick(event) {
+            if (!state.active || state.pointerId !== event.pointerId) {
+                return;
+            }
+            state.active = false;
+            state.pointerId = null;
+            resetKnob();
+            scheduleFlush(true);
+            event.preventDefault();
+        }
+
+        joystick.addEventListener('pointerup', releaseJoystick);
+        joystick.addEventListener('pointercancel', releaseJoystick);
+        joystick.addEventListener('lostpointercapture', () => {
+            if (state.active) {
+                state.active = false;
+                state.pointerId = null;
+                resetKnob();
+                scheduleFlush(true);
+            }
+        });
+
+        baseSpeed.addEventListener('input', () => {
+            speedReadout.textContent = baseSpeed.value;
+            if (state.active) {
+                scheduleFlush(false);
+            }
+        });
+
+        centerBtn.addEventListener('click', () => {
+            sendCommand('center_steering');
+            state.lastSent.angle = 100;
+            steerReadout.textContent = 'Center';
+        });
+
+        stopBtn.addEventListener('click', () => {
+            sendCommand('stop');
+            sendCommand('center_steering');
+            resetKnob();
+            state.lastSent.mode = 'stop';
+            state.lastSent.angle = 100;
+            steerReadout.textContent = 'Center';
+        });
+
+        refreshBtn.addEventListener('click', () => {
+            const current = cameraFeed.src.split('?')[0];
+            cameraFeed.src = `${current}?width=480&height=360&quality=60&fps=12&t=${Date.now()}`;
+        });
+
+        window.addEventListener('resize', () => {
+            updateJoystickMetrics();
+            resetKnob();
+        });
+
+        speedReadout.textContent = baseSpeed.value;
+        updateJoystickMetrics();
+        resetKnob();
+    </script>
+</body>
+</html>
