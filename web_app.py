@@ -87,6 +87,29 @@ class CameraStream:
 camera_stream = None
 
 
+def find_working_camera_index(preferred_index=None, max_index=10):
+    """Return the first camera index that can actually produce frames."""
+    candidates = []
+    if preferred_index is not None:
+        candidates.append(preferred_index)
+    candidates.extend(i for i in range(max_index + 1) if i not in candidates)
+
+    for index in candidates:
+        cap = cv2.VideoCapture(index)
+        if not cap.isOpened():
+            cap.release()
+            continue
+
+        try:
+            ok, _ = cap.read()
+            if ok:
+                return index
+        finally:
+            cap.release()
+
+    return None
+
+
 def init_camera_stream():
     global camera_stream
     if camera_stream is not None and camera_stream.running:
@@ -94,7 +117,11 @@ def init_camera_stream():
 
     camera_stream = None
 
-    stream = CameraStream(0)
+    camera_index = find_working_camera_index()
+    if camera_index is None:
+        raise RuntimeError("No usable camera was found")
+
+    stream = CameraStream(camera_index)
     try:
         stream.start()
     except Exception:
@@ -102,7 +129,7 @@ def init_camera_stream():
         raise
 
     camera_stream = stream
-    logger.info("Camera stream initialized successfully")
+    logger.info("Camera stream initialized successfully on camera index %s", camera_index)
     return camera_stream
 
 def init_car():

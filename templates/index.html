@@ -33,6 +33,12 @@
             margin-top: 0;
             color: #555;
         }
+        .control-tip {
+            margin-top: 8px;
+            color: #666;
+            font-size: 13px;
+            line-height: 1.4;
+        }
         .control-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -106,12 +112,19 @@
             grid-template-columns: 1fr 1fr 1fr;
             grid-template-rows: 1fr 1fr 1fr;
             gap: 10px;
-            max-width: 200px;
+            max-width: 260px;
             margin: 20px auto;
         }
         .direction-controls button {
-            padding: 15px;
+            min-height: 68px;
+            padding: 12px;
             font-size: 18px;
+            font-weight: 700;
+        }
+        .direction-controls button:active,
+        .btn-active {
+            transform: scale(0.97);
+            filter: brightness(1.08);
         }
         .center-btn {
             grid-column: 2;
@@ -199,6 +212,9 @@
         <!-- Movement Controls -->
         <div class="control-section">
             <h2>Movement Controls</h2>
+            <div class="control-tip">
+                Use WASD or the arrow keys. Hold a direction to keep moving, release to stop.
+            </div>
 
             <div class="slider-container">
                 <label for="speed-slider">Speed: <span id="speed-value">50</span>%</label>
@@ -313,20 +329,20 @@
             switch(key) {
                 // WASD for movement
                 case 'w':
+                case 'arrowup':
                     sendCommand('forward');
                     break;
                 case 's':
+                case 'arrowdown':
                     sendCommand('backward');
                     break;
                 case 'd':
+                case 'arrowright':
                     sendCommand('turn_left', {angle: 30});
                     break;
                 case 'a':
-                    sendCommand('turn_right', {angle: 30});
-                    break;
-                // Arrow keys are reserved so they do not trigger anything here
                 case 'arrowleft':
-                case 'arrowright':
+                    sendCommand('turn_right', {angle: 30});
                     break;
                 case 'e':
                     sendCommand('center_steering');
@@ -372,12 +388,36 @@
         });
 
         // Button controls (still available for touch devices)
-        document.getElementById('forward').addEventListener('click', () => sendCommand('forward'));
-        document.getElementById('backward').addEventListener('click', () => sendCommand('backward'));
-        document.getElementById('stop').addEventListener('click', () => sendCommand('stop'));
-        document.getElementById('turn-left').addEventListener('click', () => sendCommand('turn_left', {angle: 30}));
-        document.getElementById('turn-right').addEventListener('click', () => sendCommand('turn_right', {angle: 30}));
-        document.getElementById('center-steering').addEventListener('click', () => sendCommand('center_steering'));
+        function flashButton(id) {
+            const button = document.getElementById(id);
+            button.classList.add('btn-active');
+            setTimeout(() => button.classList.remove('btn-active'), 120);
+        }
+
+        document.getElementById('forward').addEventListener('click', () => {
+            flashButton('forward');
+            sendCommand('forward');
+        });
+        document.getElementById('backward').addEventListener('click', () => {
+            flashButton('backward');
+            sendCommand('backward');
+        });
+        document.getElementById('stop').addEventListener('click', () => {
+            flashButton('stop');
+            sendCommand('stop');
+        });
+        document.getElementById('turn-left').addEventListener('click', () => {
+            flashButton('turn-left');
+            sendCommand('turn_left', {angle: 30});
+        });
+        document.getElementById('turn-right').addEventListener('click', () => {
+            flashButton('turn-right');
+            sendCommand('turn_right', {angle: 30});
+        });
+        document.getElementById('center-steering').addEventListener('click', () => {
+            flashButton('center-steering');
+            sendCommand('center_steering');
+        });
 
         // Full screen camera
         document.getElementById('fullscreen-btn').addEventListener('click', function() {
@@ -436,7 +476,7 @@
         `;
         instructions.innerHTML = `
             <strong>Keyboard Controls:</strong><br>
-            <strong>Movement (WASD):</strong> W=Forward, S=Backward, A=Turn Left, D=Turn Right<br>
+            <strong>Movement:</strong> W/↑=Forward, S/↓=Backward, A/←=Turn Left, D/→=Turn Right<br>
             <strong>Steering:</strong> E=Center Steering<br>
             <strong>Emergency Stop:</strong> Spacebar<br>
         `;

@@ -37,10 +37,14 @@ class CarControl:
     def forward(self):
         """Move car forward"""
         try:
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 0):  # Inverted for motor A
+            # The board wiring on this setup drives the car forward when both
+            # direction lines are set the same way the old "backward" path used
+            # to do. Keep the API name as forward, but flip the low-level bits
+            # so the public controls match the real vehicle motion.
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):
                 logger.error("Failed to set forward direction for right motor")
                 return False
-            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 1):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 0):
                 logger.error("Failed to set forward direction for left motor")
                 return False
             return True
@@ -51,10 +55,12 @@ class CarControl:
     def backward(self):
         """Move car backward"""
         try:
-            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 1):  # Inverted for motor A
+            # See forward() above: the hardware directions are inverted from the
+            # original names, so backward uses the opposite bit pattern.
+            if not self.mdev.writeReg(self.mdev.CMD_DIR1, 0):
                 logger.error("Failed to set backward direction for right motor")
                 return False
-            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 0):
+            if not self.mdev.writeReg(self.mdev.CMD_DIR2, 1):
                 logger.error("Failed to set backward direction for left motor")
                 return False
             return True
