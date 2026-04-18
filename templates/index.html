@@ -95,22 +95,6 @@
             border-radius: 5px;
             background: #111;
         }
-        .camera-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
-            margin-top: 10px;
-            font-size: 14px;
-            color: #555;
-        }
-        .camera-meta select {
-            padding: 8px 10px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            background: white;
-        }
         .status-display {
             background-color: #f8f9fa;
             padding: 10px;
@@ -206,13 +190,7 @@
             <h2>Camera Feed</h2>
             <div class="camera-container">
                 <img id="camera-feed" src="/camera_feed?width=320&height=240&quality=55&fps=12" class="camera-feed" alt="Camera Feed" loading="eager" decoding="async">
-                <div class="camera-meta">
-                    <label for="camera-stream-quality">Stream quality:</label>
-                    <select id="camera-stream-quality">
-                        <option value="low" selected>Low bandwidth</option>
-                        <option value="balanced">Balanced</option>
-                        <option value="high">High quality</option>
-                    </select>
+                <div style="text-align: center; margin-top: 10px;">
                     <button id="fullscreen-btn" class="btn-success">Full Screen</button>
                 </div>
             </div>
@@ -246,26 +224,6 @@
             </div>
         </div>
 
-        <!-- Camera Controls -->
-        <div class="control-section">
-            <h2>Camera Controls</h2>
-
-            <div class="control-grid">
-                <button id="camera-center" class="btn-success">⊕ Center</button>
-                <button id="camera-left" class="btn-primary">← Left</button>
-                <button id="camera-right" class="btn-primary">→ Right</button>
-            </div>
-        </div>
-
-        <!-- Sensors -->
-        <div class="control-section">
-            <h2>Sensors</h2>
-            <div class="sensor-display">
-                Distance: <span id="distance-display">0</span> cm
-            </div>
-            <button id="update-distance" class="btn-primary">Update Distance</button>
-        </div>
-
         <!-- Outputs -->
         <div class="control-section">
             <h2>Outputs</h2>
@@ -292,10 +250,7 @@
             <div class="status-display">
                 <div>Car Initialized: <span id="car-status">Checking...</span></div>
                 <div>Steering Angle: <span id="steering-angle">0</span>°</div>
-                <div>Camera Pan: <span id="camera-pan">0</span>°</div>
-                <div>Camera Tilt: <span id="camera-tilt">0</span>°</div>
                 <div>Speed: <span id="current-speed">0</span>%</div>
-                <div>Distance: <span id="current-distance">0</span> cm</div>
                 <div>LED Red: <span id="led-red-status">Off</span></div>
                 <div>LED Green: <span id="led-green-status">Off</span></div>
                 <div>LED Blue: <span id="led-blue-status">Off</span></div>
@@ -369,19 +324,12 @@
                 case 'a':
                     sendCommand('turn_right', {angle: 30});
                     break;
-                // Arrow keys for camera (only left/right)
+                // Arrow keys are reserved so they do not trigger anything here
                 case 'arrowleft':
-                    sendCommand('camera_left', {angle: 10});
-                    break;
                 case 'arrowright':
-                    sendCommand('camera_right', {angle: 10});
                     break;
-                // Center controls
                 case 'e':
                     sendCommand('center_steering');
-                    break;
-                case 'q':
-                    sendCommand('camera_center');
                     break;
                 // Space for emergency stop - kills everything
                 case ' ':
@@ -431,11 +379,6 @@
         document.getElementById('turn-right').addEventListener('click', () => sendCommand('turn_right', {angle: 30}));
         document.getElementById('center-steering').addEventListener('click', () => sendCommand('center_steering'));
 
-        // Camera controls
-        document.getElementById('camera-left').addEventListener('click', () => sendCommand('camera_left', {angle: 10}));
-        document.getElementById('camera-right').addEventListener('click', () => sendCommand('camera_right', {angle: 10}));
-        document.getElementById('camera-center').addEventListener('click', () => sendCommand('camera_center'));
-
         // Full screen camera
         document.getElementById('fullscreen-btn').addEventListener('click', function() {
             const img = document.querySelector('.camera-feed');
@@ -447,23 +390,6 @@
                 img.msRequestFullscreen();
             }
         });
-
-        const cameraFeed = document.getElementById('camera-feed');
-        const cameraStreamQuality = document.getElementById('camera-stream-quality');
-
-        const cameraProfiles = {
-            low: { width: 320, height: 240, quality: 45, fps: 8 },
-            balanced: { width: 480, height: 360, quality: 60, fps: 12 },
-            high: { width: 640, height: 480, quality: 80, fps: 20 }
-        };
-
-        function updateCameraStream() {
-            const profile = cameraProfiles[cameraStreamQuality.value] || cameraProfiles.low;
-            const params = new URLSearchParams(profile);
-            cameraFeed.src = `/camera_feed?${params.toString()}`;
-        }
-
-        cameraStreamQuality.addEventListener('change', updateCameraStream);
 
         // Buzzer controls
         document.getElementById('buzzer-on').addEventListener('click', () => sendCommand('buzzer_on', {frequency: 2000}));
@@ -479,19 +405,6 @@
             });
         });
 
-        // Sensor updates
-        async function updateDistance() {
-            try {
-                const response = await fetch('/sensor/distance');
-                const data = await response.json();
-                document.getElementById('distance-display').textContent = data.distance.toFixed(1);
-            } catch (error) {
-                console.error('Error updating distance:', error);
-            }
-        }
-
-        document.getElementById('update-distance').addEventListener('click', updateDistance);
-
         // Status updates
         async function updateStatus() {
             try {
@@ -499,10 +412,7 @@
                 const data = await response.json();
                 document.getElementById('car-status').textContent = data.car_initialized ? 'Yes' : 'No';
                 document.getElementById('steering-angle').textContent = data.steering_angle;
-                document.getElementById('camera-pan').textContent = data.camera_pan;
-                document.getElementById('camera-tilt').textContent = data.camera_tilt;
                 document.getElementById('current-speed').textContent = data.speed;
-                document.getElementById('current-distance').textContent = data.distance.toFixed(1);
                 document.getElementById('led-red-status').textContent = data.led_red ? 'On' : 'Off';
                 document.getElementById('led-green-status').textContent = data.led_green ? 'On' : 'Off';
                 document.getElementById('led-blue-status').textContent = data.led_blue ? 'On' : 'Off';
@@ -527,15 +437,13 @@
         instructions.innerHTML = `
             <strong>Keyboard Controls:</strong><br>
             <strong>Movement (WASD):</strong> W=Forward, S=Backward, A=Turn Left, D=Turn Right<br>
-            <strong>Camera (Arrow Keys):</strong> ←=Left, →=Right, Q=Center Camera<br>
             <strong>Steering:</strong> E=Center Steering<br>
             <strong>Emergency Stop:</strong> Spacebar<br>
         `;
         document.querySelector('.container').insertBefore(instructions, document.querySelector('.container').firstChild.nextSibling);
 
-        // Auto-update status and distance every 2 seconds
+        // Auto-update status every 2 seconds
         setInterval(() => {
-            updateDistance();
             updateStatus();
         }, 2000);
 

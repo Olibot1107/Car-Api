@@ -89,11 +89,19 @@ camera_stream = None
 
 def init_camera_stream():
     global camera_stream
-    if camera_stream is not None:
+    if camera_stream is not None and camera_stream.running:
         return camera_stream
 
-    camera_stream = CameraStream(0)
-    camera_stream.start()
+    camera_stream = None
+
+    stream = CameraStream(0)
+    try:
+        stream.start()
+    except Exception:
+        stream.stop()
+        raise
+
+    camera_stream = stream
     logger.info("Camera stream initialized successfully")
     return camera_stream
 
@@ -114,10 +122,13 @@ def generate_camera_feed(target_width=320, target_height=240, quality=55, fps=12
     stream = init_camera_stream()
     interval = 1.0 / max(1, fps)
     last_frame_id = -1
+    start_time = time.time()
 
     while True:
         frame, frame_id = stream.get_latest_frame()
         if frame is None:
+            if time.time() - start_time > 5:
+                raise RuntimeError("Camera did not provide frames in time")
             time.sleep(0.05)
             continue
 
@@ -172,16 +183,6 @@ def control(action):
             success = car.turn_right(angle)
         elif action == 'center_steering':
             success = car.center_steering()
-        elif action == 'camera_left':
-            success = car.camera_left(angle)
-        elif action == 'camera_right':
-            success = car.camera_right(angle)
-        elif action == 'camera_up':
-            success = car.camera_up(angle)
-        elif action == 'camera_down':
-            success = car.camera_down(angle)
-        elif action == 'camera_center':
-            success = car.camera_center()
         elif action == 'buzzer_on':
             frequency = data.get('frequency', 2000)
             success = car.buzzer_on(frequency)
@@ -242,27 +243,12 @@ def camera_feed():
     return Response(generate_camera_feed(width, height, quality, fps),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/sensor/distance')
-def get_distance():
-    if not car:
-        return jsonify({'distance': 0, 'success': False})
-
-    try:
-        distance = car.get_distance()
-        return jsonify({'distance': distance, 'success': True})
-    except Exception as e:
-        logger.error(f"Distance sensor error: {e}")
-        return jsonify({'distance': 0, 'success': False, 'error': str(e)})
-
 @app.route('/status')
 def status():
     return jsonify({
         'car_initialized': car is not None,
         'steering_angle': car.get_steering() if car else 0,
-        'camera_pan': car.get_camera_pan() if car else 0,
-        'camera_tilt': car.get_camera_tilt() if car else 0,
         'speed': car.get_speed() if car and hasattr(car, 'get_speed') else 0,
-        'distance': car.get_distance() if car else 0,
         'led_red': car.led_red_state if car and hasattr(car, 'led_red_state') else False,
         'led_green': car.led_green_state if car and hasattr(car, 'led_green_state') else False,
         'led_blue': car.led_blue_state if car and hasattr(car, 'led_blue_state') else False,
