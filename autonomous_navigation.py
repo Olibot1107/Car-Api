@@ -36,7 +36,11 @@ class LatestFrameCamera:
         self.latest_frame = None
 
     def start(self):
-        self.capture = cv2.VideoCapture(self.index)
+        # CAP_V4L2 is the most reliable backend on Linux, but fall back to the
+        # default backend if it is not available.
+        self.capture = cv2.VideoCapture(self.index, cv2.CAP_V4L2)
+        if not self.capture.isOpened():
+            self.capture = cv2.VideoCapture(self.index)
         if not self.capture.isOpened():
             raise RuntimeError(f"Could not open camera index {self.index}")
 
@@ -73,6 +77,32 @@ class LatestFrameCamera:
         self.running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
+
+
+def find_working_camera_index(preferred_index=None, max_index=10):
+    """Return the first camera index that can produce a frame."""
+    candidates = []
+    if preferred_index is not None:
+        candidates.append(preferred_index)
+    candidates.extend(i for i in range(max_index + 1) if i not in candidates)
+
+    for index in candidates:
+        cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(index)
+        if not cap.isOpened():
+            cap.release()
+            continue
+
+        try:
+            ok, _ = cap.read()
+            if ok:
+                cap.release()
+                return index
+        finally:
+            cap.release()
+
+    return None
 
 
 class CameraNavigator:
@@ -169,7 +199,8 @@ class CameraNavigator:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Camera-driven autonomous navigation")
-    parser.add_argument("--camera-index", type=int, default=0, help="Camera device index")
+    parser.add_argument("--camera-index", type=int, default=None, help="Camera device index; auto-detect when omitted")
+    parser.add_argument("--max-camera-index", type=int, default=10, help="Highest camera index to probe during auto-detect")
     parser.add_argument("--width", type=int, default=320, help="Camera capture width")
     parser.add_argument("--height", type=int, default=240, help="Camera capture height")
     parser.add_argument("--speed", type=int, default=35, help="Cruise speed percentage")
@@ -195,7 +226,16 @@ def main():
     try:
         logger.info("Starting autonomous navigation")
         car = CarControl()
-        camera = LatestFrameCamera(args.camera_index, args.width, args.height)
+        camera_index = args.camera_index
+        if camera_index is None:
+            camera_index = find_working_camera_index(max_index=args.max_camera_index)
+            if camera_index is None:
+                raise RuntimeError(
+                    f"No usable camera found in indices 0..{args.max_camera_index}"
+                )
+            logger.info("Auto-detected camera index %s", camera_index)
+
+        camera = LatestFrameCamera(camera_index, args.width, args.height)
         camera.start()
 
         navigator = CameraNavigator(
